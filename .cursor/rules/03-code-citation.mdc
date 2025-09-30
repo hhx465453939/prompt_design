@@ -1,0 +1,26 @@
+---
+globs: *
+description: 代码引用与代码块规范（严格）
+---
+# 现有代码的引用（必须）
+- 当展示仓库“已存在”的代码时，使用带行号与路径的代码引用块：
+
+```12:34:app/components/Todo.tsx
+// 这里是示例引用内容
+```
+
+- 三个要素必填：startLine、endLine、filepath；禁止添加语言 tag；禁止空块；三反引号顶格。
+
+# 提议/新建代码
+- 当展示“尚未存在”的提议代码时，使用标准 Markdown 代码块并指定语言：
+
+```typescript
+export function example() {
+  return true;
+}
+```
+
+# 禁止事项
+- 禁止在代码内容中包含行号。
+- 禁止混用两种代码展示格式。
+- 禁止缩进开头的反引号。

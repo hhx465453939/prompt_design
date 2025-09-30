@@ -1,0 +1,19 @@
+---
+alwaysApply: false
+description: 上手指南与工作流提示
+---
+# 快速上手
+- 先阅读 [README.md](mdc:README.md) 获取项目结构与使用方式。
+- 统一输出风格：遵循 `02-markdown-style.mdc`。
+- 代码/现有内容引用：严格遵循 `03-code-citation.mdc`。
+
+# 进行改动时
+- 中大型任务前创建 TODO，状态随进度更新（见 `04-execution-todo.mdc`）。
+- 每次操作前后给出 1-3 句“状态更新”。
+
+# 提示词优化建议
+- 基于 `meta_prompt/提示词迭代优化工程师.md` 执行“三步最短路径”。
+- 增强版提示词不含“新增/优化”标记；所有差异写入“对比报告”。
+
+# 提交与文档
+- 新增或调整提示词请同步更新 `01-project-structure.mdc` 与 `README.md`。

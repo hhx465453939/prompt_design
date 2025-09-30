@@ -1,0 +1,22 @@
+---
+alwaysApply: true
+description: 项目结构与参考资料入口
+---
+# 项目结构
+- 本仓库包含以下关键文档与目录（仅列关键入口，详见 README）：
+- 根目录：
+  - [README.md](mdc:README.md)
+  - [新增内容核心目标.md](mdc:新增内容核心目标.md)
+- 目录：
+  - ATOM_prompt/
+    - [agent专用提示词工程师.md](mdc:ATOM_prompt/agent专用提示词工程师.md)
+    - [agent专用提示词工程师_性能强化250930.md](mdc:ATOM_prompt/agent专用提示词工程师_性能强化250930.md)
+  - role_prompt/
+    - [3.带建议优化角色_最优选_高智能模型.md](mdc:role_prompt/3.带建议优化角色_最优选_高智能模型.md)
+    - [3.带建议优化角色_最优选_高智能模型_性能强化250930.md](mdc:role_prompt/3.带建议优化角色_最优选_高智能模型_性能强化250930.md)
+  - meta_prompt/
+    - [提示词迭代优化工程师.md](mdc:meta_prompt/提示词迭代优化工程师.md)
+
+# 使用建议
+- 将上述文档视为“约束与灵感源”，在方案与实现前先检索关联内容。
+- 规则文件位于 `.cursor/rules/*.mdc`，支持全局与按文件类型生效的细粒度规则。
