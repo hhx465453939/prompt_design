@@ -7,7 +7,7 @@
  * 3. 运行：node test-core.mjs
  */
 
-import { LLMService, RouterService, ConductorAgent } from './packages/core/dist/index.js';
+import { LLMService, RouterService, ConductorAgent } from './packages/core/dist/index.cjs';
 import { config } from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';

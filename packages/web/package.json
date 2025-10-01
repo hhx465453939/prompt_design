@@ -1,0 +1,25 @@
+{
+  "name": "@prompt-matrix/web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@prompt-matrix/core": "workspace:*",
+    "@prompt-matrix/ui": "workspace:*",
+    "vue": "^3.5.13",
+    "naive-ui": "^2.40.1",
+    "@vicons/ionicons5": "^0.12.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "typescript": "^5.8.2",
+    "vite": "^6.0.5",
+    "vue-tsc": "^2.2.0"
+  }
+}
+

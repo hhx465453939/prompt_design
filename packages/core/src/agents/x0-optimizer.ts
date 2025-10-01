@@ -47,6 +47,30 @@ export class X0OptimizerAgent {
   }
 
   /**
+   * 流式执行优化任务
+   */
+  async executeStream(
+    context: RequestContext,
+    onChunk: (chunk: string) => void
+  ) {
+    logger.debug('X0 Optimizer streaming...', {
+      inputLength: context.userInput.length,
+    });
+
+    const messages = [
+      { role: 'system' as const, content: this.systemPrompt },
+      { role: 'user' as const, content: this.buildUserPrompt(context) },
+    ];
+
+    await this.llmService.chatStream(messages, onChunk);
+
+    return {
+      tokensUsed: 0,
+      suggestions: ['优化完成', '结构化增强'],
+    } as any;
+  }
+
+  /**
    * 构建用户提示词
    */
   private buildUserPrompt(context: RequestContext): string {

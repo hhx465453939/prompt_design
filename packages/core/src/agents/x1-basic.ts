@@ -46,6 +46,27 @@ export class X1BasicAgent {
   }
 
   /**
+   * 流式执行（支持前端SSE/Fetch streaming对接）
+   */
+  async executeStream(
+    context: RequestContext,
+    onChunk: (chunk: string) => void
+  ) {
+    const messages = [
+      { role: 'system' as const, content: this.systemPrompt },
+      { role: 'user' as const, content: this.buildUserPrompt(context) },
+    ];
+
+    await this.llmService.chatStream(messages, onChunk);
+
+    // 这里返回一个精简的元数据，主内容由流式回调累积
+    return {
+      tokensUsed: 0,
+      suggestions: ['已应用ATOM框架', '结构化设计完成'],
+    } as any;
+  }
+
+  /**
    * 构建用户提示词
    */
   private buildUserPrompt(context: RequestContext): string {

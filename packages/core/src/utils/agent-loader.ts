@@ -2,16 +2,95 @@
  * Agent加载器 - 从agent_matrix目录加载Prompt模板
  */
 
-import { readFileSync } from 'fs';
-import { join } from 'path';
 import { AgentType, AgentConfig } from '../types';
 import { logger } from './logger';
 
-export class AgentLoader {
-  private agentMatrixPath: string;
+// 检测运行环境
+const isBrowser = typeof window !== 'undefined';
 
-  constructor(basePath: string = process.cwd()) {
-    this.agentMatrixPath = join(basePath, 'agent_matrix');
+// 浏览器环境下的默认提示词
+const DEFAULT_PROMPTS = {
+  X0_OPTIMIZER: `你是X0提示词优化师，专注于提示词的融合式优化。
+
+核心能力：
+- 提示词结构优化
+- Token利用率提升
+- 安全边界增强
+- 多维度系统性优化
+
+工作流程：
+1. 分析现有提示词的结构和内容
+2. 识别优化空间和改进点
+3. 提供具体的优化建议
+4. 确保优化后的提示词更加高效、安全、易用`,
+
+  X0_REVERSE: `你是X0逆向工程师，专注于提示词的分析和反向工程。
+
+核心能力：
+- 提示词框架识别
+- 工程师类型推理
+- 优化空间分析
+- 改进建议生成
+
+工作流程：
+1. 分析提示词的结构和组成
+2. 识别使用的框架和模式
+3. 评估提示词的质量和效果
+4. 提供改进建议和优化方向`,
+
+  X1_BASIC: `你是X1基础提示词工程师，基于ATOM框架进行提示词设计。
+
+ATOM框架：
+- Action（行动）：明确任务目标
+- Target（对象）：定义操作对象
+- Output（输出）：规定输出格式
+- Manner（方式）：指定执行方式
+
+核心能力：
+- ATOM框架标准化设计
+- 通用场景提示词生成
+- 结构化输出保证
+- 最佳实践应用
+
+设计原则：
+- 清晰的任务定义
+- 明确的输出格式
+- 合理的约束条件
+- 可复用的模板结构`,
+
+  X4_SCENARIO: `你是X4场景特化工程师，专注于特定应用场景的提示词设计。
+
+核心能力：
+- 场景化提示词设计
+- 编程/写作/分析等专业场景适配
+- 上下文优化
+- 场景最佳实践应用
+
+支持的场景类型：
+- 编程开发场景
+- 内容创作场景
+- 数据分析场景
+- 业务咨询场景
+- 教育培训场景
+
+设计原则：
+- 深入理解场景需求
+- 提供专业领域知识
+- 优化场景特定的交互方式
+- 确保输出符合场景规范`
+};
+
+export class AgentLoader {
+  private agentMatrixPath?: string;
+  private useFileSystem: boolean;
+
+  constructor(basePath?: string) {
+    this.useFileSystem = !isBrowser && basePath !== undefined;
+    if (this.useFileSystem && basePath) {
+      // 只在 Node.js 环境中导入 path
+      const path = require('path');
+      this.agentMatrixPath = path.join(basePath, 'agent_matrix');
+    }
   }
 
   /**
@@ -19,9 +98,9 @@ export class AgentLoader {
    */
   loadX0Optimizer(): AgentConfig {
     try {
-      const template = this.readAgentFile(
-        'X0_optimizer/sources/提示词迭代优化工程师.md'
-      );
+      const template = this.useFileSystem
+        ? this.readAgentFile('X0_optimizer/sources/提示词迭代优化工程师.md')
+        : DEFAULT_PROMPTS.X0_OPTIMIZER;
       
       return {
         type: 'X0_OPTIMIZER',
@@ -45,9 +124,9 @@ export class AgentLoader {
    */
   loadX0Reverse(): AgentConfig {
     try {
-      const template = this.readAgentFile(
-        'X0_reverse/reverse_engineer.md'
-      );
+      const template = this.useFileSystem
+        ? this.readAgentFile('X0_reverse/reverse_engineer.md')
+        : DEFAULT_PROMPTS.X0_REVERSE;
       
       return {
         type: 'X0_REVERSE',
@@ -71,9 +150,9 @@ export class AgentLoader {
    */
   loadX1Basic(): AgentConfig {
     try {
-      const template = this.readAgentFile(
-        'X1_basic/sources/agent专用提示词工程师_性能强化250930.md'
-      );
+      const template = this.useFileSystem
+        ? this.readAgentFile('X1_basic/sources/agent专用提示词工程师_性能强化250930.md')
+        : DEFAULT_PROMPTS.X1_BASIC;
       
       return {
         type: 'X1_BASIC',
@@ -97,9 +176,9 @@ export class AgentLoader {
    */
   loadX4Scenario(): AgentConfig {
     try {
-      const template = this.readAgentFile(
-        'X4_scenario/sources/3.带建议优化角色_最优选_高智能模型_性能强化250930.md'
-      );
+      const template = this.useFileSystem
+        ? this.readAgentFile('X4_scenario/sources/3.带建议优化角色_最优选_高智能模型_性能强化250930.md')
+        : DEFAULT_PROMPTS.X4_SCENARIO;
       
       return {
         type: 'X4_SCENARIO',
@@ -134,11 +213,18 @@ export class AgentLoader {
   }
 
   /**
-   * 读取Agent文件
+   * 读取Agent文件（仅在Node.js环境中可用）
    */
   private readAgentFile(relativePath: string): string {
-    const fullPath = join(this.agentMatrixPath, relativePath);
-    return readFileSync(fullPath, 'utf-8');
+    if (!this.useFileSystem || !this.agentMatrixPath) {
+      throw new Error('File system access not available in browser environment');
+    }
+    
+    // 动态导入 fs 和 path
+    const fs = require('fs');
+    const path = require('path');
+    const fullPath = path.join(this.agentMatrixPath, relativePath);
+    return fs.readFileSync(fullPath, 'utf-8');
   }
 
   /**
@@ -153,6 +239,8 @@ export class AgentLoader {
   }
 }
 
-// 导出单例
-export const agentLoader = new AgentLoader();
+// 导出单例（浏览器环境下不传入basePath）
+export const agentLoader = new AgentLoader(
+  !isBrowser && typeof process !== 'undefined' ? process.cwd() : undefined
+);
 

@@ -135,6 +135,30 @@ pnpm dev
 
 ---
 
+### 开发命令
+
+```bash
+# 完整开发流程（推荐）
+pnpm dev                 # 构建core → 启动web开发服务器
+
+# 单独构建
+pnpm build:core          # 构建核心服务层
+pnpm build:ui            # 构建UI组件库
+pnpm build:web           # 构建Web应用
+pnpm build               # 构建所有包
+
+# 测试
+pnpm test                # 运行所有测试
+pnpm test:core           # 单独测试core包
+
+# 清理
+pnpm clean               # 清理所有构建产物
+pnpm clean:dist          # 清理dist目录
+pnpm clean:vite          # 清理Vite缓存
+```
+
+---
+
 ### 使用示例
 
 #### 代码集成
@@ -308,16 +332,16 @@ prompt_design/
 | 类型系统          | ✅   | 完整TypeScript类型定义            |
 | 文档              | ✅   | PRD + 架构 + 快速开始 + 开发指南  |
 
-### ⏳ Phase 2: 前端界面（待开发）
+### ✅ Phase 2: 前端界面（已完成）
 
 | 功能模块          | 状态 | 说明                              |
 |-------------------|------|-----------------------------------|
-| UI组件库          | ⏳   | Vue 3 + Naive UI                  |
-| ChatWindow        | ⏳   | 对话窗口组件                      |
-| PromptEditor      | ⏳   | 提示词编辑器                      |
-| ConfigPanel       | ⏳   | 配置面板                          |
-| PromptLibrary     | ⏳   | 提示词库界面                      |
-| Web应用           | ⏳   | 完整Web应用集成                   |
+| UI组件库          | ✅   | Vue 3 + Naive UI                  |
+| ChatWindow        | ✅   | 对话窗口组件                      |
+| PromptEditor      | ✅   | 输入框组件                        |
+| ConfigPanel       | ✅   | 配置面板                          |
+| MessageItem       | ✅   | 消息显示组件                      |
+| Web应用           | ✅   | 完整Web应用集成                   |
 
 ### ⏳ Phase 3-5: 功能完善、测试、部署（计划中）
 

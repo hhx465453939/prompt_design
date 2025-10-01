@@ -58,13 +58,16 @@ export class RouterService {
         metadata: context?.metadata || {},
       };
 
-      // 步骤2: 意图分析
+      // 步骤2: 意图分析（支持强制路由）
       logger.info('Step 1: Analyzing user intent...');
-      const intent = await this.conductor.analyzeIntent(userInput, fullContext);
+      const forcedAgent = (fullContext as any).metadata?.forcedAgent as AgentType | undefined;
+      const intent = forcedAgent ? 'CHAT' : await this.conductor.analyzeIntent(userInput, fullContext);
 
       // 步骤3: 路由决策
       logger.info('Step 2: Making routing decision...');
-      const decision = await this.conductor.makeRoutingDecision(intent, fullContext);
+      const decision = forcedAgent
+        ? { targetAgent: forcedAgent, intent, reasoning: 'Forced by user selection' }
+        : await this.conductor.makeRoutingDecision(intent, fullContext);
 
       // 步骤4: 调用目标Agent
       logger.info(`Step 3: Routing to ${decision.targetAgent}...`);
@@ -116,8 +119,57 @@ export class RouterService {
     onChunk: (chunk: string) => void,
     context?: Partial<RequestContext>
   ): Promise<AgentResponse> {
-    // TODO: 实现流式响应
-    throw new Error('Stream mode not implemented yet');
+    const startTime = Date.now();
+
+    // 构建上下文
+    const fullContext: RequestContext = {
+      userInput,
+      history: context?.history || this.conversationHistory,
+      config: context?.config || this.llmService.getConfig()!,
+      metadata: context?.metadata || {},
+    };
+
+    // 意图与路由
+    const intent = await this.conductor.analyzeIntent(userInput, fullContext);
+    const decision = await this.conductor.makeRoutingDecision(intent, fullContext);
+
+    const targetAgent = this.agents.get(decision.targetAgent);
+    if (!targetAgent) {
+      throw new Error(`Agent not found: ${decision.targetAgent}`);
+    }
+
+    // 如果Agent支持流式，则使用
+    if (typeof targetAgent.executeStream === 'function') {
+      await targetAgent.executeStream(fullContext, onChunk);
+    } else {
+      // 否则退化为一次性输出
+      const result = await targetAgent.execute(fullContext);
+      onChunk(result.content);
+    }
+
+    // 由于内容通过回调输出，这里只返回元信息
+    const response: AgentResponse = {
+      agentType: decision.targetAgent,
+      content: '',
+      intent: decision.intent,
+      metadata: {
+        tokensUsed: 0,
+        thinkingProcess: decision.reasoning,
+        suggestions: [],
+      },
+      timestamp: Date.now(),
+    };
+
+    // 历史记录只追加用户输入，助手内容由调用方在完成后自行追加完整文本（或忽略）
+    this.conversationHistory.push({ role: 'user', content: userInput, timestamp: Date.now() });
+
+    const duration = Date.now() - startTime;
+    logger.info(`Stream request completed in ${duration}ms`, {
+      intent,
+      agent: decision.targetAgent,
+    });
+
+    return response;
   }
 
   /**
@@ -138,11 +190,8 @@ export class RouterService {
 
     // 限制历史长度
     let maxLength = 50;
-    if (typeof import.meta !== 'undefined' && import.meta.env) {
-      maxLength = parseInt(import.meta.env.VITE_MAX_HISTORY_LENGTH || '50');
-    } else if (typeof process !== 'undefined' && process.env) {
-      maxLength = parseInt(process.env.VITE_MAX_HISTORY_LENGTH || process.env.MAX_HISTORY_LENGTH || '50');
-    }
+    // 在浏览器环境中使用默认值，环境变量由构建时注入
+    maxLength = 50;
     
     if (this.conversationHistory.length > maxLength) {
       this.conversationHistory = this.conversationHistory.slice(-maxLength);

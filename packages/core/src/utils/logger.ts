@@ -14,19 +14,8 @@ export class Logger {
   private level: LogLevel = LogLevel.INFO;
 
   private constructor() {
-    // 从环境变量读取日志级别
-    if (typeof import.meta !== 'undefined' && import.meta.env) {
-      const debugMode = import.meta.env.VITE_DEBUG_MODE === 'true';
-      if (debugMode) {
-        this.level = LogLevel.DEBUG;
-      }
-    } else if (typeof process !== 'undefined' && process.env) {
-      // Node.js 环境
-      const debugMode = process.env.VITE_DEBUG_MODE === 'true' || process.env.DEBUG_MODE === 'true';
-      if (debugMode) {
-        this.level = LogLevel.DEBUG;
-      }
-    }
+    // 在浏览器环境中使用默认级别，环境变量由构建时注入
+    this.level = LogLevel.INFO;
   }
 
   static getInstance(): Logger {

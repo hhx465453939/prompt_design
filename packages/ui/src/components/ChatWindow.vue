@@ -1,0 +1,289 @@
+<template>
+  <div class="chat-window">
+    <!-- 顶部标题栏 -->
+    <div class="chat-header">
+      <div class="header-left">
+        <h1 class="title">🤖 智能提示词工程师</h1>
+        <p class="subtitle">AI Agent 矩阵 · 智能路由系统</p>
+      </div>
+      <div class="header-right">
+        <n-button quaternary circle @click="emit('openSettings')">
+          <template #icon>
+            <n-icon><SettingsOutline /></n-icon>
+          </template>
+        </n-button>
+        <n-button quaternary circle @click="emit('clearHistory')">
+          <template #icon>
+            <n-icon><TrashOutline /></n-icon>
+          </template>
+        </n-button>
+      </div>
+    </div>
+
+    <!-- 消息列表区域 -->
+    <div ref="messagesContainer" class="messages-container">
+      <div v-if="messages.length === 0" class="empty-state">
+        <div class="empty-icon">
+          <n-icon size="120" :color="'#667eea'">
+            <ChatboxOutline />
+          </n-icon>
+        </div>
+        <h2 class="empty-title">开始对话，让 AI Agent 帮你生成和优化提示词</h2>
+        <p class="empty-description">
+          基于智能路由系统，自动识别你的需求并调度专业 Agent
+        </p>
+        <div class="example-cards">
+          <div class="example-label">💡 快速开始</div>
+          <div class="example-grid">
+            <div
+              v-for="(example, index) in examples"
+              :key="index"
+              class="example-card"
+              @click="emit('sendExample', example.text)"
+            >
+              <div class="example-icon">{{ example.icon }}</div>
+              <div class="example-text">{{ example.text }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <TransitionGroup name="message" tag="div">
+        <MessageItem
+          v-for="message in messages"
+          :key="message.id"
+          :message="message"
+        />
+      </TransitionGroup>
+    </div>
+
+    <!-- 输入框区域 -->
+    <div class="input-area">
+      <div class="agent-select">
+        <n-select v-model:value="forcedAgent" :options="agentOptions" size="small" style="width: 200px" />
+      </div>
+      <InputBox
+        v-model="inputText"
+        :loading="loading"
+        :disabled="!isConfigured"
+        @send="handleSend"
+        @export-md="emit('exportMd')"
+        @copy-md="emit('copyMd')"
+      />
+      <n-text v-if="!isConfigured" depth="3" class="config-hint">
+        ⚠️ 请先在设置中配置 API 密钥
+      </n-text>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, nextTick, watch } from 'vue';
+import { NButton, NIcon, NEmpty, NSpace, NText, NSelect } from 'naive-ui';
+import {
+  SettingsOutline,
+  TrashOutline,
+  ChatboxOutline,
+} from '@vicons/ionicons5';
+import MessageItem from './MessageItem.vue';
+import InputBox from './InputBox.vue';
+import type { ChatMessage } from '../types';
+
+interface Props {
+  messages: ChatMessage[];
+  loading?: boolean;
+  isConfigured?: boolean;
+}
+
+interface Emits {
+  (e: 'send', message: string, forcedAgent?: string): void;
+  (e: 'sendExample', example: string): void;
+  (e: 'openSettings'): void;
+  (e: 'clearHistory'): void;
+  (e: 'exportMd'): void;
+  (e: 'copyMd'): void;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  loading: false,
+  isConfigured: false,
+});
+
+const emit = defineEmits<Emits>();
+
+// 输入文本
+const inputText = ref('');
+const forcedAgent = ref<string>('AUTO');
+const agentOptions = [
+  { label: '自动（Conductor）', value: 'AUTO' },
+  { label: 'X0 优化师', value: 'X0_OPTIMIZER' },
+  { label: 'X0 逆向', value: 'X0_REVERSE' },
+  { label: 'X1 基础', value: 'X1_BASIC' },
+  { label: 'X4 场景', value: 'X4_SCENARIO' },
+];
+
+// 消息容器
+const messagesContainer = ref<HTMLElement>();
+
+// 示例提示
+const examples = [
+  { icon: '📊', text: '帮我设计一个数据分析助手' },
+  { icon: '⚡', text: '优化这个提示词：你是一个Python助手' },
+  { icon: '🤖', text: '设计一个通用的AI助手' },
+  { icon: '📝', text: '我需要一个代码审查助手' },
+];
+
+// 发送消息
+const handleSend = () => {
+  if (inputText.value.trim()) {
+    const text = inputText.value.trim();
+    emit('send', text, forcedAgent.value);
+    inputText.value = '';
+  }
+};
+
+// 自动滚动到底部
+const scrollToBottom = () => {
+  nextTick(() => {
+    if (messagesContainer.value) {
+      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
+    }
+  });
+};
+
+// 监听消息变化，自动滚动
+watch(() => props.messages.length, scrollToBottom);
+</script>
+
+<style scoped>
+.chat-window {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #f8f9fa;
+}
+
+.chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 32px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+}
+
+.header-left {
+  flex: 1;
+}
+
+.title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.subtitle {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
+}
+
+.header-right {
+  display: flex;
+  gap: 12px;
+}
+
+.header-right :deep(.n-button) {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+}
+
+.header-right :deep(.n-button:hover) {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.header-right :deep(.n-icon) {
+  color: white;
+}
+
+.messages-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px;
+  scroll-behavior: smooth;
+}
+
+.messages-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.messages-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.messages-container::-webkit-scrollbar-thumb {
+  background: #d0d0d0;
+  border-radius: 4px;
+}
+
+.messages-container::-webkit-scrollbar-thumb:hover {
+  background: #b0b0b0;
+}
+
+.empty-state {
+  margin-top: 80px;
+  text-align: center;
+}
+
+.empty-icon { margin-bottom: 16px; }
+
+.empty-title {
+  font-size: 18px;
+  color: #4b5563;
+  margin: 8px 0 6px;
+}
+
+.empty-description {
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.example-cards { margin-top: 18px; }
+.example-label { color: #6b7280; font-size: 13px; margin-bottom: 10px; }
+.example-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; max-width: 720px; margin: 0 auto; }
+.example-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 12px; display: flex; gap: 8px; align-items: center; justify-content: center; cursor: pointer; transition: all .2s ease; }
+.example-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(102,126,234,.18); border-color: #c7d2fe; }
+.example-icon { font-size: 16px; }
+.example-text { font-size: 13px; color: #374151; }
+
+.input-area {
+  padding: 20px 32px 24px;
+  background: white;
+  border-top: 1px solid #e8e8e8;
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.04);
+}
+
+.config-hint {
+  display: block;
+  margin-top: 12px;
+  font-size: 13px;
+  text-align: center;
+  color: #f0a020;
+  font-weight: 500;
+}
+
+/* 消息动画 */
+.message-enter-active {
+  transition: all 0.4s ease;
+}
+
+.message-enter-from {
+  opacity: 0;
+  transform: translateY(30px);
+}
+</style>
+

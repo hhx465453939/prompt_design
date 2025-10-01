@@ -46,6 +46,30 @@ export class X4ScenarioAgent {
   }
 
   /**
+   * 流式执行场景化设计任务
+   */
+  async executeStream(
+    context: RequestContext,
+    onChunk: (chunk: string) => void
+  ) {
+    logger.debug('X4 Scenario streaming...', {
+      inputLength: context.userInput.length,
+    });
+
+    const messages = [
+      { role: 'system' as const, content: this.systemPrompt },
+      { role: 'user' as const, content: this.buildUserPrompt(context) },
+    ];
+
+    await this.llmService.chatStream(messages, onChunk);
+
+    return {
+      tokensUsed: 0,
+      suggestions: ['场景化设计完成', '上下文优化'],
+    } as any;
+  }
+
+  /**
    * 构建用户提示词
    */
   private buildUserPrompt(context: RequestContext): string {
