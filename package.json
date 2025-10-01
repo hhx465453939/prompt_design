@@ -1,0 +1,44 @@
+{
+  "name": "prompt-engineer-matrix",
+  "version": "1.0.0",
+  "private": true,
+  "description": "智能提示词工程师代理系统 - Agent矩阵架构",
+  "packageManager": "pnpm@10.6.1",
+  "engines": {
+    "node": "^18.0.0 || ^20.0.0 || ^22.0.0",
+    "npm": "请使用pnpm代替npm",
+    "yarn": "请使用pnpm代替yarn"
+  },
+  "scripts": {
+    "dev": "pnpm dev:core",
+    "dev:core": "pnpm -F @prompt-matrix/core dev",
+    "dev:web": "npm-run-all clean:dist build:core dev:parallel",
+    "dev:parallel": "concurrently -k -p \"[{name}]\" -n \"CORE,WEB\" \"pnpm -F @prompt-matrix/core build --watch\" \"pnpm -F @prompt-matrix/web dev\"",
+    "build": "pnpm build:core",
+    "build:core": "pnpm -F @prompt-matrix/core build",
+    "build:ui": "pnpm -F @prompt-matrix/ui build",
+    "build:web": "pnpm -F @prompt-matrix/web build",
+    "build:all": "npm-run-all build:core build:ui build:web",
+    "clean": "npm-run-all clean:dist clean:vite",
+    "clean:dist": "rimraf \"packages/core/dist\"",
+    "clean:vite": "rimraf \"packages/core/node_modules/.vite\"",
+    "test": "pnpm -r test --run --passWithNoTests",
+    "lint": "echo \"No linters configured yet\"",
+    "lint:fix": "echo \"No linters configured yet\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "dotenv": "^16.4.7",
+    "npm-run-all": "^4.1.5",
+    "rimraf": "^4.4.1",
+    "typescript": "^5.8.2"
+  },
+  "keywords": [
+    "prompt-engineering",
+    "ai-agent",
+    "llm",
+    "agent-matrix"
+  ],
+  "author": "pp",
+  "license": "MIT"
+}
