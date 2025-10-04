@@ -35,6 +35,14 @@ export class LLMService {
         });
         break;
       
+      case 'gemini':
+        this.client = new OpenAI({
+          apiKey: config.apiKey,
+          baseURL: config.baseURL || 'https://generativelanguage.googleapis.com/v1beta',
+          dangerouslyAllowBrowser: true,
+        });
+        break;
+      
       default:
         throw new Error(`Unsupported provider: ${config.provider}`);
     }
