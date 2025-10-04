@@ -112,11 +112,12 @@ export class RouterService {
   }
 
   /**
-   * 流式处理（待实现）
+   * 流式处理
    */
   async handleRequestStream(
     userInput: string,
     onChunk: (chunk: string) => void,
+    onThinking?: (thinking: string) => void,
     context?: Partial<RequestContext>
   ): Promise<AgentResponse> {
     const startTime = Date.now();
@@ -130,7 +131,10 @@ export class RouterService {
     };
 
     // 意图与路由
+    onThinking?.('🔍 **意图分析**\n正在解析您的需求...');
     const intent = await this.conductor.analyzeIntent(userInput, fullContext);
+    
+    onThinking?.(`🎯 **意图识别**：${intent}\n\n🤔 **路由决策**\n正在选择最合适的专家Agent...`);
     const decision = await this.conductor.makeRoutingDecision(intent, fullContext);
 
     const targetAgent = this.agents.get(decision.targetAgent);
@@ -138,9 +142,11 @@ export class RouterService {
       throw new Error(`Agent not found: ${decision.targetAgent}`);
     }
 
+    onThinking?.(`✅ **专家选择**：${this.getAgentName(decision.targetAgent)}\n\n**📋 决策依据**：${decision.reasoning}\n\n🚀 **开始处理**\n${this.getAgentName(decision.targetAgent)}正在为您生成专业的回答...`);
+
     // 如果Agent支持流式，则使用
     if (typeof targetAgent.executeStream === 'function') {
-      await targetAgent.executeStream(fullContext, onChunk);
+      await targetAgent.executeStream(fullContext, onChunk, onThinking);
     } else {
       // 否则退化为一次性输出
       const result = await targetAgent.execute(fullContext);
@@ -170,6 +176,27 @@ export class RouterService {
     });
 
     return response;
+  }
+
+  /**
+   * 获取Agent名称
+   */
+  private getAgentName(agentType: AgentType): string {
+    const agentNames: Record<AgentType, string> = {
+      CONDUCTOR: '指挥官',
+      X0_OPTIMIZER: 'X0优化师',
+      X0_REVERSE: 'X0逆向工程师',
+      X1_BASIC: 'X1基础工程师',
+      X4_SCENARIO: 'X4场景工程师',
+    };
+    return agentNames[agentType] || agentType;
+  }
+
+  /**
+   * 添加历史消息
+   */
+  addHistoryMessage(message: Message) {
+    this.conversationHistory.push(message);
   }
 
   /**

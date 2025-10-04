@@ -25,11 +25,7 @@
 
       <!-- 消息主体 -->
       <div class="message-body">
-        <template v-if="message.isLoading || message.streaming">
-          <div class="thinking">
-            <n-spin size="small" />
-            <span class="thinking-text">正在思考中...</span>
-          </div>
+        <template v-if="message.streaming">
           <div v-if="message.thinkingProcess" class="thinking-block">
             <div class="thinking-title">思考过程</div>
             <div class="thinking-content" v-html="renderMarkdown(message.thinkingProcess)" />
@@ -47,10 +43,25 @@
       </div>
 
       <!-- 消息底部元信息 -->
-      <div v-if="message.tokensUsed" class="message-footer">
-        <n-tag size="tiny" :bordered="false">
-          📊 {{ message.tokensUsed }} tokens
-        </n-tag>
+      <div class="message-footer">
+        <div class="message-meta">
+          <n-tag v-if="message.tokensUsed" size="tiny" :bordered="false">
+            📊 {{ message.tokensUsed }} tokens
+          </n-tag>
+        </div>
+        <div class="message-actions">
+          <n-dropdown
+            :options="copyOptions"
+            placement="bottom-end"
+            @select="handleCopyAction"
+          >
+            <n-button quaternary size="tiny" circle>
+              <template #icon>
+                <n-icon><CopyOutline /></n-icon>
+              </template>
+            </n-button>
+          </n-dropdown>
+        </div>
       </div>
     </div>
   </div>
@@ -58,8 +69,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { NAvatar, NIcon, NSpin, NAlert, NTag } from 'naive-ui';
-import { PersonOutline } from '@vicons/ionicons5';
+import { NAvatar, NIcon, NSpin, NAlert, NTag, NButton, NDropdown } from 'naive-ui';
+import { PersonOutline, CopyOutline } from '@vicons/ionicons5';
 import { marked } from 'marked';
 import AgentIndicator from './AgentIndicator.vue';
 import type { ChatMessage } from '../types';
@@ -69,7 +80,12 @@ interface Props {
   message: ChatMessage;
 }
 
+interface Emits {
+  (e: 'copy', message: ChatMessage, option?: string): void;
+}
+
 const props = defineProps<Props>();
+const emit = defineEmits<Emits>();
 
 // Agent 映射
 const agentMap: Record<AgentType, { name: string; icon: string; color: string }> = {
@@ -121,6 +137,31 @@ const renderMarkdown = (content: string) => {
     breaks: true,
     gfm: true,
   });
+};
+
+// 复制选项
+const copyOptions = computed(() => {
+  const options = [
+    {
+      label: '复制 Markdown',
+      key: 'markdown',
+    },
+  ];
+
+  // 如果是助手消息且有思考过程，添加包含思考的选项
+  if (props.message.role === 'assistant' && props.message.thinkingProcess) {
+    options.push({
+      label: '复制 Markdown（包含思考）',
+      key: 'markdown-with-thinking',
+    });
+  }
+
+  return options;
+});
+
+// 处理复制操作
+const handleCopyAction = (key: string) => {
+  emit('copy', props.message, key);
 };
 </script>
 
@@ -269,7 +310,24 @@ const renderMarkdown = (content: string) => {
 .message-footer {
   margin-top: 10px;
   display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
+}
+
+.message-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.message-actions {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.message-item:hover .message-actions {
+  opacity: 1;
 }
 
 .thinking {

@@ -9,8 +9,10 @@
       @send-example="handleSendExample"
       @open-settings="showConfig = true"
       @clear-history="handleClearHistory"
-    @exportMd="exportMarkdown()"
-    @copyMd="copyMarkdown()"
+      @export-md="exportMarkdown()"
+      @copy-md="copyMarkdown()"
+      @load-session="handleLoadSession"
+      @copy-message="handleCopyMessage"
     />
 
     <!-- 配置面板 -->
@@ -117,7 +119,21 @@ const initializeServices = () => {
       temperature: configStore.config.value.temperature,
       maxTokens: configStore.config.value.maxTokens,
       topP: configStore.config.value.topP,
+      customProviderId: configStore.config.value.customProviderId,
     };
+
+    // 如果provider是'custom'但没有customProviderId，尝试恢复或重置配置
+    if (coreConfig.provider === 'custom' && !coreConfig.customProviderId) {
+      console.warn('Custom provider detected but missing ID, switching to deepseek');
+      coreConfig.provider = 'deepseek';
+      // 更新配置存储
+      const updatedConfig = {
+        ...configStore.config.value,
+        provider: 'deepseek' as const,
+        customProviderId: undefined,
+      };
+      configStore.saveConfig(updatedConfig);
+    }
 
     llmService.initialize(coreConfig);
 
@@ -163,21 +179,35 @@ const handleSend = async (text: string, selectedAgent?: string) => {
       agentType: 'CONDUCTOR',
       intent: 'CHAT',
       streaming: true,
-      thinkingProcess: '解析意图中…\n\n- 检测是否为完整提示词\n- 判断是否为优化请求\n- 场景/基础设计分流',
+      thinkingProcess: '正在分析您的需求...',
     });
 
     // 真实流式：调用流式接口
     let accumulatedContent = '';
+    let currentThinkingProcess = '正在分析您的需求...';
+    
     const meta = await routerService!.handleRequestStream(
       text,
       (chunk: string) => {
         accumulatedContent += chunk;
-        // 使用chatStore的方法更新消息内容
+        // 直接更新streamingMsg的内容
+        streamingMsg.content = accumulatedContent;
+        // 强制触发响应式更新
         const messageIndex = chatStore.messages.value.findIndex(m => m.id === streamingMsg.id);
         if (messageIndex !== -1) {
-          chatStore.messages.value[messageIndex].content = accumulatedContent;
-          // 强制触发响应式更新
           chatStore.messages.value = [...chatStore.messages.value];
+        }
+      },
+      (thinkingChunk?: string) => {
+        // 如果有思考过程更新，更新thinkingProcess
+        if (thinkingChunk) {
+          currentThinkingProcess = thinkingChunk;
+          streamingMsg.thinkingProcess = currentThinkingProcess;
+          // 强制触发响应式更新
+          const messageIndex = chatStore.messages.value.findIndex(m => m.id === streamingMsg.id);
+          if (messageIndex !== -1) {
+            chatStore.messages.value = [...chatStore.messages.value];
+          }
         }
       },
       {
@@ -193,6 +223,8 @@ const handleSend = async (text: string, selectedAgent?: string) => {
     streamingMsg.intent = meta.intent;
     // 确保最终内容是完整的
     streamingMsg.content = accumulatedContent;
+    // 清理思考过程显示
+    streamingMsg.thinkingProcess = undefined;
 
     console.log('✅ Response received:', {
       agent: meta.agentType,
@@ -251,6 +283,58 @@ const handleClearHistory = () => {
       message.success('历史已清空');
     },
   });
+};
+
+/**
+ * 加载会话
+ */
+const handleLoadSession = (messages: any[]) => {
+  chatStore.messages.value = messages;
+  if (routerService) {
+    routerService.clearHistory();
+    // 将历史消息添加到路由服务的历史记录中
+    messages.forEach(msg => {
+      if (msg.role === 'user' && msg.content) {
+        // 通过公共方法添加历史记录（如果有的话）
+        routerService!.addHistoryMessage({
+          role: 'user',
+          content: msg.content,
+          timestamp: msg.timestamp || Date.now(),
+        });
+      }
+    });
+  }
+};
+
+/**
+ * 复制消息
+ */
+const handleCopyMessage = async (message: any, option: string = 'markdown') => {
+  try {
+    let contentToCopy = '';
+    
+    if (option === 'markdown-with-thinking' && message.thinkingProcess) {
+      // 包含思考过程的内容
+      contentToCopy = `## 思考过程
+
+${message.thinkingProcess}
+
+## 回答
+
+${message.content}`;
+    } else {
+      // 普通markdown内容
+      contentToCopy = message.content;
+    }
+    
+    await navigator.clipboard.writeText(contentToCopy);
+    
+    const actionText = option === 'markdown-with-thinking' ? '（包含思考）' : '';
+    message.success(`Markdown内容${actionText}已复制到剪贴板`);
+  } catch (error) {
+    console.error('复制失败:', error);
+    message.error('复制失败');
+  }
 };
 
 /**

@@ -55,7 +55,20 @@ const initializeServices = () => {
             temperature: configStore.config.value.temperature,
             maxTokens: configStore.config.value.maxTokens,
             topP: configStore.config.value.topP,
+            customProviderId: configStore.config.value.customProviderId,
         };
+        // 如果provider是'custom'但没有customProviderId，尝试恢复或重置配置
+        if (coreConfig.provider === 'custom' && !coreConfig.customProviderId) {
+            console.warn('Custom provider detected but missing ID, switching to deepseek');
+            coreConfig.provider = 'deepseek';
+            // 更新配置存储
+            const updatedConfig = {
+                ...configStore.config.value,
+                provider: 'deepseek',
+                customProviderId: undefined,
+            };
+            configStore.saveConfig(updatedConfig);
+        }
         llmService.initialize(coreConfig);
         // 创建路由服务
         routerService = new RouterService(llmService);
@@ -95,18 +108,30 @@ const handleSend = async (text, selectedAgent) => {
             agentType: 'CONDUCTOR',
             intent: 'CHAT',
             streaming: true,
-            thinkingProcess: '解析意图中…\n\n- 检测是否为完整提示词\n- 判断是否为优化请求\n- 场景/基础设计分流',
+            thinkingProcess: '正在分析您的需求...',
         });
         // 真实流式：调用流式接口
         let accumulatedContent = '';
+        let currentThinkingProcess = '正在分析您的需求...';
         const meta = await routerService.handleRequestStream(text, (chunk) => {
             accumulatedContent += chunk;
-            // 使用chatStore的方法更新消息内容
+            // 直接更新streamingMsg的内容
+            streamingMsg.content = accumulatedContent;
+            // 强制触发响应式更新
             const messageIndex = chatStore.messages.value.findIndex(m => m.id === streamingMsg.id);
             if (messageIndex !== -1) {
-                chatStore.messages.value[messageIndex].content = accumulatedContent;
-                // 强制触发响应式更新
                 chatStore.messages.value = [...chatStore.messages.value];
+            }
+        }, (thinkingChunk) => {
+            // 如果有思考过程更新，更新thinkingProcess
+            if (thinkingChunk) {
+                currentThinkingProcess = thinkingChunk;
+                streamingMsg.thinkingProcess = currentThinkingProcess;
+                // 强制触发响应式更新
+                const messageIndex = chatStore.messages.value.findIndex(m => m.id === streamingMsg.id);
+                if (messageIndex !== -1) {
+                    chatStore.messages.value = [...chatStore.messages.value];
+                }
             }
         }, {
             metadata: {
@@ -119,6 +144,8 @@ const handleSend = async (text, selectedAgent) => {
         streamingMsg.intent = meta.intent;
         // 确保最终内容是完整的
         streamingMsg.content = accumulatedContent;
+        // 清理思考过程显示
+        streamingMsg.thinkingProcess = undefined;
         console.log('✅ Response received:', {
             agent: meta.agentType,
             intent: meta.intent,
@@ -171,6 +198,55 @@ const handleClearHistory = () => {
     });
 };
 /**
+ * 加载会话
+ */
+const handleLoadSession = (messages) => {
+    chatStore.messages.value = messages;
+    if (routerService) {
+        routerService.clearHistory();
+        // 将历史消息添加到路由服务的历史记录中
+        messages.forEach(msg => {
+            if (msg.role === 'user' && msg.content) {
+                // 通过公共方法添加历史记录（如果有的话）
+                routerService.addHistoryMessage({
+                    role: 'user',
+                    content: msg.content,
+                    timestamp: msg.timestamp || Date.now(),
+                });
+            }
+        });
+    }
+};
+/**
+ * 复制消息
+ */
+const handleCopyMessage = async (message, option = 'markdown') => {
+    try {
+        let contentToCopy = '';
+        if (option === 'markdown-with-thinking' && message.thinkingProcess) {
+            // 包含思考过程的内容
+            contentToCopy = `## 思考过程
+
+${message.thinkingProcess}
+
+## 回答
+
+${message.content}`;
+        }
+        else {
+            // 普通markdown内容
+            contentToCopy = message.content;
+        }
+        await navigator.clipboard.writeText(contentToCopy);
+        const actionText = option === 'markdown-with-thinking' ? '（包含思考）' : '';
+        message.success(`Markdown内容${actionText}已复制到剪贴板`);
+    }
+    catch (error) {
+        console.error('复制失败:', error);
+        message.error('复制失败');
+    }
+};
+/**
  * 组件挂载
  */
 onMounted(() => {
@@ -209,6 +285,8 @@ const __VLS_1 = __VLS_asFunctionalComponent(__VLS_0, new __VLS_0({
     ...{ 'onClearHistory': {} },
     ...{ 'onExportMd': {} },
     ...{ 'onCopyMd': {} },
+    ...{ 'onLoadSession': {} },
+    ...{ 'onCopyMessage': {} },
     messages: (__VLS_ctx.chatStore.messages.value),
     loading: (__VLS_ctx.chatStore.loading.value),
     isConfigured: (__VLS_ctx.configStore.isConfigured.value),
@@ -220,6 +298,8 @@ const __VLS_2 = __VLS_1({
     ...{ 'onClearHistory': {} },
     ...{ 'onExportMd': {} },
     ...{ 'onCopyMd': {} },
+    ...{ 'onLoadSession': {} },
+    ...{ 'onCopyMessage': {} },
     messages: (__VLS_ctx.chatStore.messages.value),
     loading: (__VLS_ctx.chatStore.loading.value),
     isConfigured: (__VLS_ctx.configStore.isConfigured.value),
@@ -251,81 +331,87 @@ const __VLS_12 = {
         __VLS_ctx.copyMarkdown();
     }
 };
+const __VLS_13 = {
+    onLoadSession: (__VLS_ctx.handleLoadSession)
+};
+const __VLS_14 = {
+    onCopyMessage: (__VLS_ctx.handleCopyMessage)
+};
 var __VLS_3;
-const __VLS_13 = {}.ConfigPanel;
+const __VLS_15 = {}.ConfigPanel;
 /** @type {[typeof __VLS_components.ConfigPanel, ]} */ ;
 // @ts-ignore
-const __VLS_14 = __VLS_asFunctionalComponent(__VLS_13, new __VLS_13({
+const __VLS_16 = __VLS_asFunctionalComponent(__VLS_15, new __VLS_15({
     ...{ 'onSave': {} },
     show: (__VLS_ctx.showConfig),
     config: (__VLS_ctx.configStore.config.value),
 }));
-const __VLS_15 = __VLS_14({
+const __VLS_17 = __VLS_16({
     ...{ 'onSave': {} },
     show: (__VLS_ctx.showConfig),
     config: (__VLS_ctx.configStore.config.value),
-}, ...__VLS_functionalComponentArgsRest(__VLS_14));
-let __VLS_17;
-let __VLS_18;
+}, ...__VLS_functionalComponentArgsRest(__VLS_16));
 let __VLS_19;
-const __VLS_20 = {
+let __VLS_20;
+let __VLS_21;
+const __VLS_22 = {
     onSave: (__VLS_ctx.handleSaveConfig)
 };
-var __VLS_16;
-const __VLS_21 = {}.NModal;
+var __VLS_18;
+const __VLS_23 = {}.NModal;
 /** @type {[typeof __VLS_components.NModal, typeof __VLS_components.nModal, typeof __VLS_components.NModal, typeof __VLS_components.nModal, ]} */ ;
 // @ts-ignore
-const __VLS_22 = __VLS_asFunctionalComponent(__VLS_21, new __VLS_21({
+const __VLS_24 = __VLS_asFunctionalComponent(__VLS_23, new __VLS_23({
     ...{ 'onPositiveClick': {} },
     show: (__VLS_ctx.showWelcome),
     preset: "dialog",
     title: "👋 欢迎使用智能提示词工程师系统",
     positiveText: "开始使用",
 }));
-const __VLS_23 = __VLS_22({
+const __VLS_25 = __VLS_24({
     ...{ 'onPositiveClick': {} },
     show: (__VLS_ctx.showWelcome),
     preset: "dialog",
     title: "👋 欢迎使用智能提示词工程师系统",
     positiveText: "开始使用",
-}, ...__VLS_functionalComponentArgsRest(__VLS_22));
-let __VLS_25;
-let __VLS_26;
+}, ...__VLS_functionalComponentArgsRest(__VLS_24));
 let __VLS_27;
-const __VLS_28 = {
+let __VLS_28;
+let __VLS_29;
+const __VLS_30 = {
     onPositiveClick: (...[$event]) => {
         __VLS_ctx.showWelcome = false;
     }
 };
-__VLS_24.slots.default;
-const __VLS_29 = {}.NSpace;
+__VLS_26.slots.default;
+const __VLS_31 = {}.NSpace;
 /** @type {[typeof __VLS_components.NSpace, typeof __VLS_components.nSpace, typeof __VLS_components.NSpace, typeof __VLS_components.nSpace, ]} */ ;
 // @ts-ignore
-const __VLS_30 = __VLS_asFunctionalComponent(__VLS_29, new __VLS_29({
+const __VLS_32 = __VLS_asFunctionalComponent(__VLS_31, new __VLS_31({
     vertical: true,
 }));
-const __VLS_31 = __VLS_30({
+const __VLS_33 = __VLS_32({
     vertical: true,
-}, ...__VLS_functionalComponentArgsRest(__VLS_30));
-__VLS_32.slots.default;
-const __VLS_33 = {}.NText;
+}, ...__VLS_functionalComponentArgsRest(__VLS_32));
+__VLS_34.slots.default;
+const __VLS_35 = {}.NText;
 /** @type {[typeof __VLS_components.NText, typeof __VLS_components.nText, typeof __VLS_components.NText, typeof __VLS_components.nText, ]} */ ;
 // @ts-ignore
-const __VLS_34 = __VLS_asFunctionalComponent(__VLS_33, new __VLS_33({}));
-const __VLS_35 = __VLS_34({}, ...__VLS_functionalComponentArgsRest(__VLS_34));
-__VLS_36.slots.default;
-var __VLS_36;
-const __VLS_37 = {}.NText;
+const __VLS_36 = __VLS_asFunctionalComponent(__VLS_35, new __VLS_35({}));
+const __VLS_37 = __VLS_36({}, ...__VLS_functionalComponentArgsRest(__VLS_36));
+__VLS_38.slots.default;
+var __VLS_38;
+const __VLS_39 = {}.NText;
 /** @type {[typeof __VLS_components.NText, typeof __VLS_components.nText, typeof __VLS_components.NText, typeof __VLS_components.nText, ]} */ ;
 // @ts-ignore
-const __VLS_38 = __VLS_asFunctionalComponent(__VLS_37, new __VLS_37({
+const __VLS_40 = __VLS_asFunctionalComponent(__VLS_39, new __VLS_39({
     depth: "3",
 }));
-const __VLS_39 = __VLS_38({
+const __VLS_41 = __VLS_40({
     depth: "3",
-}, ...__VLS_functionalComponentArgsRest(__VLS_38));
-__VLS_40.slots.default;
-var __VLS_40;
+}, ...__VLS_functionalComponentArgsRest(__VLS_40));
+__VLS_42.slots.default;
+var __VLS_42;
 __VLS_asFunctionalElement(__VLS_intrinsicElements.ul, __VLS_intrinsicElements.ul)({
     ...{ style: {} },
 });
@@ -335,22 +421,22 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.li, __VLS_intrinsicElements.li
 __VLS_asFunctionalElement(__VLS_intrinsicElements.li, __VLS_intrinsicElements.li)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.li, __VLS_intrinsicElements.li)({});
 if (!__VLS_ctx.configStore.isConfigured.value) {
-    const __VLS_41 = {}.NAlert;
+    const __VLS_43 = {}.NAlert;
     /** @type {[typeof __VLS_components.NAlert, typeof __VLS_components.nAlert, typeof __VLS_components.NAlert, typeof __VLS_components.nAlert, ]} */ ;
     // @ts-ignore
-    const __VLS_42 = __VLS_asFunctionalComponent(__VLS_41, new __VLS_41({
+    const __VLS_44 = __VLS_asFunctionalComponent(__VLS_43, new __VLS_43({
         type: "warning",
         title: "温馨提示",
     }));
-    const __VLS_43 = __VLS_42({
+    const __VLS_45 = __VLS_44({
         type: "warning",
         title: "温馨提示",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_42));
-    __VLS_44.slots.default;
-    var __VLS_44;
+    }, ...__VLS_functionalComponentArgsRest(__VLS_44));
+    __VLS_46.slots.default;
+    var __VLS_46;
 }
-var __VLS_32;
-var __VLS_24;
+var __VLS_34;
+var __VLS_26;
 /** @type {__VLS_StyleScopedClasses['app-content']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
@@ -372,6 +458,8 @@ const __VLS_self = (await import('vue')).defineComponent({
             handleSendExample: handleSendExample,
             handleSaveConfig: handleSaveConfig,
             handleClearHistory: handleClearHistory,
+            handleLoadSession: handleLoadSession,
+            handleCopyMessage: handleCopyMessage,
         };
     },
 });

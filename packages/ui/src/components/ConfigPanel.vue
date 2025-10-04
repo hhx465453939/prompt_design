@@ -89,6 +89,27 @@
           </n-space>
         </n-form-item>
 
+        <!-- 模型信息 -->
+        <n-form-item v-if="selectedModelInfo" label="模型特性">
+          <n-space>
+            <n-tag v-if="selectedModelInfo.isThinkingModel" type="warning" size="small">
+              🧠 思考模型
+            </n-tag>
+            <n-tag v-if="selectedModelInfo.isMultimodal" type="info" size="small">
+              🖼️ 多模态
+            </n-tag>
+            <n-tag v-if="selectedModelInfo.isLatest" type="success" size="small">
+              ✨ 最新版本
+            </n-tag>
+            <n-tag v-if="selectedModelInfo.size !== 'Unknown'" type="default" size="small">
+              📊 {{ selectedModelInfo.size }}
+            </n-tag>
+            <n-tag v-if="selectedModelInfo.contextLength !== 'Unknown'" type="default" size="small">
+              📝 {{ selectedModelInfo.contextLength }}
+            </n-tag>
+          </n-space>
+        </n-form-item>
+
         <!-- 高级参数 -->
         <n-divider />
         <n-collapse>
@@ -238,6 +259,7 @@ const providerOptions = computed(() => {
 const testingConnection = ref(false);
 const loadingModels = ref(false);
 const availableModels = ref<string[]>([]);
+const selectedModelInfo = ref<any>(null);
 
 // 自定义供应商管理器状态
 const showCustomProviderManager = ref(false);
@@ -342,6 +364,70 @@ const getProviderValue = () => {
   return formData.value.provider;
 };
 
+// 分析模型信息
+const analyzeModelInfo = (modelName: string) => {
+  if (!modelName) {
+    selectedModelInfo.value = null;
+    return;
+  }
+
+  const info = {
+    name: modelName,
+    // 检测是否为思考模型
+    isThinkingModel: modelName.toLowerCase().includes('reasoner') || 
+                      modelName.toLowerCase().includes('thinking') ||
+                      modelName.toLowerCase().includes('o1') ||
+                      modelName.toLowerCase().includes('r1'),
+    // 检测是否为多模态模型
+    isMultimodal: modelName.toLowerCase().includes('vision') ||
+                  modelName.toLowerCase().includes('image') ||
+                  modelName.toLowerCase().includes('gpt-4v') ||
+                  modelName.toLowerCase().includes('claude-3') ||
+                  modelName.toLowerCase().includes('gemini-pro-vision'),
+    // 检测是否为最新版本
+    isLatest: modelName.toLowerCase().includes('turbo') ||
+              modelName.toLowerCase().includes('gpt-4o') ||
+              modelName.toLowerCase().includes('claude-3.5') ||
+              modelName.toLowerCase().includes('deepseek-v3') ||
+              modelName.toLowerCase().includes('qwen-2.5'),
+    // 估算模型大小
+    size: 'Unknown',
+    // 上下文长度
+    contextLength: 'Unknown',
+  };
+
+  // 根据模型名称推断更多信息
+  if (modelName.includes('8b') || modelName.includes('8B')) {
+    info.size = '8B';
+  } else if (modelName.includes('70b') || modelName.includes('70B')) {
+    info.size = '70B';
+  } else if (modelName.includes('32b') || modelName.includes('32B')) {
+    info.size = '32B';
+  } else if (modelName.includes('13b') || modelName.includes('13B')) {
+    info.size = '13B';
+  } else if (modelName.includes('7b') || modelName.includes('7B')) {
+    info.size = '7B';
+  }
+
+  // 根据模型名称推断上下文长度
+  if (modelName.includes('32k') || modelName.includes('32K')) {
+    info.contextLength = '32K';
+  } else if (modelName.includes('128k') || modelName.includes('128K')) {
+    info.contextLength = '128K';
+  } else if (modelName.includes('200k') || modelName.includes('200K')) {
+    info.contextLength = '200K';
+  } else if (modelName.includes('1m') || modelName.includes('1M')) {
+    info.contextLength = '1M';
+  }
+
+  selectedModelInfo.value = info;
+};
+
+// 监听模型变化
+watch(() => formData.value.model, (newModel) => {
+  analyzeModelInfo(newModel);
+});
+
 // 验证规则
 const rules = {
   provider: {
@@ -366,6 +452,8 @@ watch(() => props.show, (val) => {
   visible.value = val;
   if (val) {
     formData.value = { ...props.config };
+    // 分析当前选择的模型
+    analyzeModelInfo(formData.value.model);
   }
 });
 

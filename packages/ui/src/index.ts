@@ -10,6 +10,7 @@ export { default as InputBox } from './components/InputBox.vue';
 export { default as ConfigPanel } from './components/ConfigPanel.vue';
 export { default as AgentIndicator } from './components/AgentIndicator.vue';
 export { default as CustomProviderManager } from './components/CustomProviderManager.vue';
+export { default as ChatSidebar } from './components/ChatSidebar.vue';
 
 // 类型导出
 export * from './types';
@@ -17,4 +18,5 @@ export * from './types';
 // Composables 导出
 export { useChatStore } from './composables/useChatStore';
 export { useConfigStore } from './composables/useConfigStore';
+export { useChatHistory } from './composables/useChatHistory';
 

@@ -3,8 +3,19 @@
  * 为前后端提供统一的日志记录功能
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
+// 动态导入fs和path模块，避免在浏览器环境中导入
+const isBrowser = typeof window !== 'undefined';
+let fs: any = null;
+let path: any = null;
+
+if (!isBrowser) {
+  try {
+    fs = require('fs');
+    path = require('path');
+  } catch (error) {
+    console.warn('Failed to import fs/path modules:', error);
+  }
+}
 
 export class UnifiedLogger {
   private logDir: string;
@@ -15,12 +26,10 @@ export class UnifiedLogger {
   private maxFiles: number = 10;
 
   constructor(logType: string = 'system') {
-    // 检查是否在浏览器环境
-    const isBrowser = typeof window !== 'undefined';
-    
-    if (isBrowser) {
-      // 浏览器环境，不使用文件系统
+    if (isBrowser || !fs || !path) {
+      // 浏览器环境或fs/path模块不可用，不使用文件系统
       this.logDir = '';
+      this.fileEnabled = false;
       return;
     }
     
@@ -49,6 +58,7 @@ export class UnifiedLogger {
    * 确保日志目录存在
    */
   private ensureLogDirectory() {
+    if (!fs || !path) return;
     if (!fs.existsSync(this.logDir)) {
       fs.mkdirSync(this.logDir, { recursive: true });
     }
@@ -58,15 +68,17 @@ export class UnifiedLogger {
    * 清理旧日志文件
    */
   private cleanupOldLogs() {
+    if (!fs || !path) return;
+    
     try {
       const files = fs.readdirSync(this.logDir)
-        .filter(file => file.endsWith('.log') && !file.includes('latest'))
-        .map(file => ({
+        .filter((file: any) => file.endsWith('.log') && !file.includes('latest'))
+        .map((file: any) => ({
           name: file,
           path: path.join(this.logDir, file),
           stats: fs.statSync(path.join(this.logDir, file))
         }))
-        .sort((a, b) => b.stats.mtime.getTime() - a.stats.mtime.getTime());
+        .sort((a: any, b: any) => b.stats.mtime.getTime() - a.stats.mtime.getTime());
       
       // 删除多余的文件
       for (let i = this.maxFiles; i < files.length; i++) {
@@ -97,6 +109,8 @@ export class UnifiedLogger {
    * 检查并轮转日志文件
    */
   private rotateLogFile() {
+    if (!fs) return;
+    
     try {
       if (fs.existsSync(this.logFile)) {
         const stats = fs.statSync(this.logFile);
@@ -137,7 +151,7 @@ export class UnifiedLogger {
     }
     
     // 文件输出
-    if (this.fileEnabled) {
+    if (this.fileEnabled && fs) {
       try {
         this.rotateLogFile();
         fs.appendFileSync(this.logFile, fullLogMessage + '\n');

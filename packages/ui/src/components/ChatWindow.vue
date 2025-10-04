@@ -1,84 +1,94 @@
 <template>
   <div class="chat-window">
-    <!-- 顶部标题栏 -->
-    <div class="chat-header">
-      <div class="header-left">
-        <h1 class="title">🤖 智能提示词工程师</h1>
-        <p class="subtitle">AI Agent 矩阵 · 智能路由系统</p>
-      </div>
-      <div class="header-right">
-        <n-button quaternary circle @click="emit('openSettings')">
-          <template #icon>
-            <n-icon><SettingsOutline /></n-icon>
-          </template>
-        </n-button>
-        <n-button quaternary circle @click="emit('clearHistory')">
-          <template #icon>
-            <n-icon><TrashOutline /></n-icon>
-          </template>
-        </n-button>
-      </div>
-    </div>
+    <!-- 侧边栏 -->
+    <ChatSidebar
+      @new-chat="handleNewChat"
+      @select-session="handleSelectSession"
+    />
 
-    <!-- 消息列表区域 -->
-    <div ref="messagesContainer" class="messages-container">
-      <div v-if="messages.length === 0" class="empty-state">
-        <div class="empty-icon">
-          <n-icon size="120" :color="'#667eea'">
-            <ChatboxOutline />
-          </n-icon>
+    <!-- 主聊天区域 -->
+    <div class="chat-main">
+      <!-- 顶部标题栏 -->
+      <div class="chat-header">
+        <div class="header-left">
+          <h1 class="title">🤖 智能提示词工程师</h1>
+          <p class="subtitle">AI Agent 矩阵 · 智能路由系统</p>
         </div>
-        <h2 class="empty-title">开始对话，让 AI Agent 帮你生成和优化提示词</h2>
-        <p class="empty-description">
-          基于智能路由系统，自动识别你的需求并调度专业 Agent
-        </p>
-        <div class="example-cards">
-          <div class="example-label">💡 快速开始</div>
-          <div class="example-grid">
-            <div
-              v-for="(example, index) in examples"
-              :key="index"
-              class="example-card"
-              @click="emit('sendExample', example.text)"
-            >
-              <div class="example-icon">{{ example.icon }}</div>
-              <div class="example-text">{{ example.text }}</div>
+        <div class="header-right">
+          <n-button quaternary circle @click="emit('openSettings')">
+            <template #icon>
+              <n-icon><SettingsOutline /></n-icon>
+            </template>
+          </n-button>
+          <n-button quaternary circle @click="emit('clearHistory')">
+            <template #icon>
+              <n-icon><TrashOutline /></n-icon>
+            </template>
+          </n-button>
+        </div>
+      </div>
+
+      <!-- 消息列表区域 -->
+      <div ref="messagesContainer" class="messages-container">
+        <div v-if="messages.length === 0" class="empty-state">
+          <div class="empty-icon">
+            <n-icon size="120" :color="'#667eea'">
+              <ChatboxOutline />
+            </n-icon>
+          </div>
+          <h2 class="empty-title">开始对话，让 AI Agent 帮你生成和优化提示词</h2>
+          <p class="empty-description">
+            基于智能路由系统，自动识别你的需求并调度专业 Agent
+          </p>
+          <div class="example-cards">
+            <div class="example-label">💡 快速开始</div>
+            <div class="example-grid">
+              <div
+                v-for="(example, index) in examples"
+                :key="index"
+                class="example-card"
+                @click="emit('sendExample', example.text)"
+              >
+                <div class="example-icon">{{ example.icon }}</div>
+                <div class="example-text">{{ example.text }}</div>
+              </div>
             </div>
           </div>
         </div>
+
+        <TransitionGroup name="message" tag="div">
+          <MessageItem
+            v-for="message in messages"
+            :key="message.id"
+            :message="message"
+            @copy="handleCopyMessage"
+          />
+        </TransitionGroup>
       </div>
 
-      <TransitionGroup name="message" tag="div">
-        <MessageItem
-          v-for="message in messages"
-          :key="message.id"
-          :message="message"
+      <!-- 输入框区域 -->
+      <div class="input-area">
+        <div class="agent-select">
+          <n-select v-model:value="forcedAgent" :options="agentOptions" size="small" style="width: 200px" />
+        </div>
+        <InputBox
+          v-model="inputText"
+          :loading="loading"
+          :disabled="!isConfigured"
+          @send="handleSend"
+          @export-md="emit('exportMd')"
+          @copy-md="emit('copyMd')"
         />
-      </TransitionGroup>
-    </div>
-
-    <!-- 输入框区域 -->
-    <div class="input-area">
-      <div class="agent-select">
-        <n-select v-model:value="forcedAgent" :options="agentOptions" size="small" style="width: 200px" />
+        <n-text v-if="!isConfigured" depth="3" class="config-hint">
+          ⚠️ 请先在设置中配置 API 密钥
+        </n-text>
       </div>
-      <InputBox
-        v-model="inputText"
-        :loading="loading"
-        :disabled="!isConfigured"
-        @send="handleSend"
-        @export-md="emit('exportMd')"
-        @copy-md="emit('copyMd')"
-      />
-      <n-text v-if="!isConfigured" depth="3" class="config-hint">
-        ⚠️ 请先在设置中配置 API 密钥
-      </n-text>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, watch } from 'vue';
+import { ref, nextTick, watch, onMounted } from 'vue';
 import { NButton, NIcon, NEmpty, NSpace, NText, NSelect } from 'naive-ui';
 import {
   SettingsOutline,
@@ -87,7 +97,9 @@ import {
 } from '@vicons/ionicons5';
 import MessageItem from './MessageItem.vue';
 import InputBox from './InputBox.vue';
+import ChatSidebar from './ChatSidebar.vue';
 import type { ChatMessage } from '../types';
+import { useChatHistory } from '../composables/useChatHistory';
 
 interface Props {
   messages: ChatMessage[];
@@ -102,6 +114,8 @@ interface Emits {
   (e: 'clearHistory'): void;
   (e: 'exportMd'): void;
   (e: 'copyMd'): void;
+  (e: 'loadSession', messages: ChatMessage[]): void;
+  (e: 'copyMessage', message: ChatMessage): void;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -110,6 +124,14 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<Emits>();
+
+// 聊天历史管理
+const {
+  currentSession,
+  createSession,
+  switchSession,
+  updateSessionMessages,
+} = useChatHistory();
 
 // 输入文本
 const inputText = ref('');
@@ -124,6 +146,24 @@ const agentOptions = [
 
 // 消息容器
 const messagesContainer = ref<HTMLElement>();
+
+// 处理新建聊天
+const handleNewChat = () => {
+  createSession();
+  // 直接清空当前消息，不触发确认对话框
+  emit('loadSession', []);
+};
+
+// 处理选择会话
+const handleSelectSession = (sessionId: string) => {
+  const messages = switchSession(sessionId);
+  emit('loadSession', messages);
+};
+
+// 处理复制消息
+const handleCopyMessage = (message: ChatMessage) => {
+  emit('copyMessage', message);
+};
 
 // 示例提示
 const examples = [
@@ -151,16 +191,34 @@ const scrollToBottom = () => {
   });
 };
 
+// 监听消息变化，更新聊天历史
+watch(() => props.messages, (newMessages) => {
+  updateSessionMessages(newMessages);
+  scrollToBottom();
+}, { deep: true });
+
 // 监听消息变化，自动滚动
 watch(() => props.messages.length, scrollToBottom);
+
+// 初始化时检查是否有当前会话，没有则创建新会话
+onMounted(() => {
+  if (!currentSession.value) {
+    createSession();
+  }
+});
 </script>
 
 <style scoped>
 .chat-window {
   display: flex;
-  flex-direction: column;
   height: 100vh;
   background: #f8f9fa;
+}
+
+.chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .chat-header {
