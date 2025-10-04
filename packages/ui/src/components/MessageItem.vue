@@ -50,6 +50,19 @@
           </n-tag>
         </div>
         <div class="message-actions">
+          <!-- 只有助手消息才有测试按钮 -->
+          <n-button
+            v-if="message.role === 'assistant'"
+            quaternary
+            size="tiny"
+            circle
+            @click="handleTestAction"
+            title="在自由聊天中测试此提示词"
+          >
+            <template #icon>
+              <n-icon><FlaskOutline /></n-icon>
+            </template>
+          </n-button>
           <n-dropdown
             :options="copyOptions"
             placement="bottom-end"
@@ -70,7 +83,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { NAvatar, NIcon, NSpin, NAlert, NTag, NButton, NDropdown } from 'naive-ui';
-import { PersonOutline, CopyOutline } from '@vicons/ionicons5';
+import { PersonOutline, CopyOutline, FlaskOutline } from '@vicons/ionicons5';
 import { marked } from 'marked';
 import AgentIndicator from './AgentIndicator.vue';
 import type { ChatMessage } from '../types';
@@ -82,6 +95,7 @@ interface Props {
 
 interface Emits {
   (e: 'copy', message: ChatMessage, option?: string): void;
+  (e: 'test', message: ChatMessage): void;
 }
 
 const props = defineProps<Props>();
@@ -162,6 +176,11 @@ const copyOptions = computed(() => {
 // 处理复制操作
 const handleCopyAction = (key: string) => {
   emit('copy', props.message, key);
+};
+
+// 处理测试操作
+const handleTestAction = () => {
+  emit('test', props.message);
 };
 </script>
 

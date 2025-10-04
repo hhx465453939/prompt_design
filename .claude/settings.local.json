@@ -7,7 +7,11 @@
       "Bash(pnpm install)",
       "Bash(npm install:*)",
       "Bash(test:*)",
-      "Bash(pnpm build)"
+      "Bash(pnpm build)",
+      "Bash(pnpm dev)",
+      "WebFetch(domain:openrouter.ai)",
+      "WebSearch",
+      "Bash(pnpm build:ui:*)"
     ],
     "deny": [],
     "ask": []

@@ -47,8 +47,11 @@
         <n-form-item label="Base URL（可选）" path="baseURL">
           <n-input
             v-model:value="formData.baseURL"
-            placeholder="例如: https://api.deepseek.com"
+            :placeholder="formData.provider === 'openrouter' ? 'https://openrouter.ai/api/v1' : '例如: https://api.deepseek.com'"
           />
+          <n-text v-if="formData.provider === 'openrouter'" depth="3" style="font-size: 12px; margin-top: 4px;">
+            💡 OpenRouter 默认: https://openrouter.ai/api/v1
+          </n-text>
         </n-form-item>
 
         <!-- 模型名称 -->
@@ -162,6 +165,32 @@
                 style="margin-top: 8px"
               />
             </n-form-item>
+
+            <!-- Reasoning Tokens (思维链预算) -->
+            <n-form-item 
+              label="Reasoning Tokens (思维链预算)" 
+              path="reasoningTokens"
+              v-if="selectedModelInfo && selectedModelInfo.isThinkingModel"
+            >
+              <n-slider
+                v-model:value="formData.reasoningTokens"
+                :min="1024"
+                :max="64000"
+                :step="1024"
+                :marks="{ 1024: '1K', 16384: '16K', 32768: '32K', 64000: '64K' }"
+              />
+              <n-input-number
+                v-model:value="formData.reasoningTokens"
+                :min="1024"
+                :max="64000"
+                :step="1024"
+                size="small"
+                style="margin-top: 8px"
+              />
+              <n-text depth="3" style="font-size: 12px; margin-top: 4px;">
+                为思考模型分配的推理预算token数量
+              </n-text>
+            </n-form-item>
           </n-collapse-item>
         </n-collapse>
       </n-form>
@@ -202,6 +231,7 @@ import {
   NCollapseItem,
   NText,
   NAlert,
+  NTag,
   useMessage,
 } from 'naive-ui';
 import type { UserConfig } from '../types';
@@ -223,7 +253,10 @@ const emit = defineEmits<Emits>();
 const message = useMessage();
 
 // 表单数据
-const formData = ref<UserConfig>({ ...props.config });
+const formData = ref<UserConfig>({ 
+  ...props.config,
+  reasoningTokens: props.config.reasoningTokens || 16384, // 默认16K
+});
 
 // 显示状态
 const visible = ref(props.show);
@@ -237,6 +270,7 @@ const providerOptions = computed(() => {
     { label: 'DeepSeek', value: 'deepseek' },
     { label: 'OpenAI', value: 'openai' },
     { label: 'Gemini', value: 'gemini' },
+    { label: 'OpenRouter', value: 'openrouter' },
   ];
   
   // 添加自定义供应商选项
@@ -373,23 +407,67 @@ const analyzeModelInfo = (modelName: string) => {
 
   const info = {
     name: modelName,
-    // 检测是否为思考模型
+    // 检测是否为思考模型（扩展检测更多模型）
     isThinkingModel: modelName.toLowerCase().includes('reasoner') || 
                       modelName.toLowerCase().includes('thinking') ||
                       modelName.toLowerCase().includes('o1') ||
-                      modelName.toLowerCase().includes('r1'),
+                      modelName.toLowerCase().includes('o3') ||
+                      modelName.toLowerCase().includes('o1-preview') ||
+                      modelName.toLowerCase().includes('o1-mini') ||
+                      modelName.toLowerCase().includes('r1') ||
+                      modelName.toLowerCase().includes('r1-') ||
+                      modelName.toLowerCase().includes('gemini-2.0') ||
+                      modelName.toLowerCase().includes('gemini-2.5') ||
+                      modelName.toLowerCase().includes('gemini-exp') ||
+                      modelName.toLowerCase().includes('gpt-5') ||
+                      modelName.toLowerCase().includes('claude-3.5-sonnet') ||
+                      modelName.toLowerCase().includes('claude-3.5-haiku') ||
+                      modelName.toLowerCase().includes('claude-3.5-opus') ||
+                      modelName.toLowerCase().includes('qwq-') ||
+                      modelName.toLowerCase().includes('deepseek-r1') ||
+                      modelName.toLowerCase().includes('grok-3') ||
+                      // OpenRouter 中的思维模型标识
+                      modelName.toLowerCase().includes('openrouter') && (
+                        modelName.toLowerCase().includes('o1') ||
+                        modelName.toLowerCase().includes('o3') ||
+                        modelName.toLowerCase().includes('r1') ||
+                        modelName.toLowerCase().includes('reasoner') ||
+                        modelName.toLowerCase().includes('thinking') ||
+                        modelName.toLowerCase().includes('qwen-') ||
+                        modelName.toLowerCase().includes('qwq-') ||
+                        modelName.toLowerCase().includes('deepseek-r1') ||
+                        modelName.toLowerCase().includes('gemini-2.0') ||
+                        modelName.toLowerCase().includes('gemini-2.5') ||
+                        modelName.toLowerCase().includes('gpt-5')
+                      ) ||
+                      // OpenRouter 思考模型的常见命名模式
+                      /^openrouter\//.test(modelName.toLowerCase()) && (
+                        modelName.toLowerCase().includes('o1') ||
+                        modelName.toLowerCase().includes('o3') ||
+                        modelName.toLowerCase().includes('r1') ||
+                        modelName.toLowerCase().includes('reason') ||
+                        modelName.toLowerCase().includes('think')
+                      ),
     // 检测是否为多模态模型
     isMultimodal: modelName.toLowerCase().includes('vision') ||
                   modelName.toLowerCase().includes('image') ||
                   modelName.toLowerCase().includes('gpt-4v') ||
                   modelName.toLowerCase().includes('claude-3') ||
-                  modelName.toLowerCase().includes('gemini-pro-vision'),
+                  modelName.toLowerCase().includes('gemini-pro-vision') ||
+                  modelName.toLowerCase().includes('gemini-2.0') ||
+                  modelName.toLowerCase().includes('gemini-2.5') ||
+                  modelName.toLowerCase().includes('multimodal'),
     // 检测是否为最新版本
     isLatest: modelName.toLowerCase().includes('turbo') ||
               modelName.toLowerCase().includes('gpt-4o') ||
               modelName.toLowerCase().includes('claude-3.5') ||
               modelName.toLowerCase().includes('deepseek-v3') ||
-              modelName.toLowerCase().includes('qwen-2.5'),
+              modelName.toLowerCase().includes('qwen-2.5') ||
+              modelName.toLowerCase().includes('gemini-2.0') ||
+              modelName.toLowerCase().includes('gemini-2.5') ||
+              modelName.toLowerCase().includes('o1') ||
+              modelName.toLowerCase().includes('o3') ||
+              modelName.toLowerCase().includes('gpt-5'),
     // 估算模型大小
     size: 'Unknown',
     // 上下文长度

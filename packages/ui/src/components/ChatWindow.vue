@@ -62,19 +62,40 @@
             :key="message.id"
             :message="message"
             @copy="handleCopyMessage"
+            @test="handleTestMessage"
           />
         </TransitionGroup>
       </div>
 
       <!-- 输入框区域 -->
       <div class="input-area">
-        <div class="agent-select">
-          <n-select v-model:value="forcedAgent" :options="agentOptions" size="small" style="width: 200px" />
+        <div class="mode-select">
+          <n-select 
+            v-model:value="chatMode" 
+            :options="modeOptions"
+            size="small" 
+            style="width: 180px"
+          />
+        </div>
+        <div v-if="chatMode === 'agent'" class="agent-select">
+          <n-select 
+            v-model:value="forcedAgent" 
+            :options="agentOptions" 
+            size="small" 
+            style="width: 200px"
+            placeholder="选择专家Agent"
+          />
+        </div>
+        <div v-else class="free-chat-hint">
+          <n-text type="info" depth="3" style="font-size: 12px;">
+            📝 自由聊天模式 - 直接测试提示词
+          </n-text>
         </div>
         <InputBox
           v-model="inputText"
           :loading="loading"
           :disabled="!isConfigured"
+          :placeholder="chatMode === 'free' ? '输入提示词或问题进行测试...' : '输入您的问题，AI Agent 将自动为您处理...'"
           @send="handleSend"
           @export-md="emit('exportMd')"
           @copy-md="emit('copyMd')"
@@ -116,6 +137,9 @@ interface Emits {
   (e: 'copyMd'): void;
   (e: 'loadSession', messages: ChatMessage[]): void;
   (e: 'copyMessage', message: ChatMessage): void;
+  (e: 'freeChat', message: string): void;
+  (e: 'testPrompt', prompt: string): void;
+  (e: 'updateLoading', loading: boolean): void;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -136,6 +160,14 @@ const {
 // 输入文本
 const inputText = ref('');
 const forcedAgent = ref<string>('AUTO');
+const chatMode = ref('agent'); // 'agent' 或 'free'
+
+// 模式选项
+const modeOptions = [
+  { label: '🤖 智能Agent模式', value: 'agent' },
+  { label: '💬 自由聊天模式', value: 'free' },
+];
+
 const agentOptions = [
   { label: '自动（Conductor）', value: 'AUTO' },
   { label: 'X0 优化师', value: 'X0_OPTIMIZER' },
@@ -152,17 +184,35 @@ const handleNewChat = () => {
   createSession();
   // 直接清空当前消息，不触发确认对话框
   emit('loadSession', []);
+  // 重置loading状态
+  emit('updateLoading', false);
 };
 
 // 处理选择会话
 const handleSelectSession = (sessionId: string) => {
   const messages = switchSession(sessionId);
   emit('loadSession', messages);
+  // 重置loading状态
+  emit('updateLoading', false);
 };
 
 // 处理复制消息
 const handleCopyMessage = (message: ChatMessage) => {
   emit('copyMessage', message);
+};
+
+// 处理测试提示词
+const handleTestMessage = (message: ChatMessage) => {
+  if (message.role === 'assistant' && message.content) {
+    // 切换到自由聊天模式
+    chatMode.value = 'free';
+    // 发送提示词到自由聊天
+    emit('testPrompt', message.content);
+    // 滚动到底部
+    nextTick(() => {
+      scrollToBottom();
+    });
+  }
 };
 
 // 示例提示
@@ -177,7 +227,13 @@ const examples = [
 const handleSend = () => {
   if (inputText.value.trim()) {
     const text = inputText.value.trim();
-    emit('send', text, forcedAgent.value);
+    if (chatMode.value === 'free') {
+      // 自由聊天模式
+      emit('freeChat', text);
+    } else {
+      // Agent模式
+      emit('send', text, forcedAgent.value);
+    }
     inputText.value = '';
   }
 };
@@ -323,6 +379,24 @@ onMounted(() => {
   background: white;
   border-top: 1px solid #e8e8e8;
   box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mode-select,
+.agent-select,
+.free-chat-hint {
+  display: flex;
+  align-items: center;
+}
+
+.free-chat-hint {
+  flex: 1;
+  padding: 8px 12px;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 6px;
 }
 
 .config-hint {

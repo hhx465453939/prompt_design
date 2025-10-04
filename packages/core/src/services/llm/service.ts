@@ -44,6 +44,18 @@ export class LLMService {
         });
         break;
       
+      case 'openrouter':
+        this.client = new OpenAI({
+          apiKey: config.apiKey,
+          baseURL: config.baseURL || 'https://openrouter.ai/api/v1',
+          dangerouslyAllowBrowser: true,
+          defaultHeaders: {
+            'HTTP-Referer': window.location.origin,
+            'X-Title': 'Prompt Engineer Matrix',
+          },
+        });
+        break;
+      
       case 'custom':
         if (!config.customProviderId) {
           throw new Error('Custom provider ID is required when provider is "custom"');
@@ -65,6 +77,13 @@ export class LLMService {
     }
     
     logger.info(`LLM Service initialized with provider: ${config.provider}`);
+  }
+
+  /**
+   * 检查服务是否已初始化
+   */
+  isInitialized(): boolean {
+    return this.client !== null && this.config !== null;
   }
 
   /**
@@ -103,8 +122,22 @@ export class LLMService {
       // 根据provider返回默认模型列表
       const defaultModels: Record<string, string[]> = {
         'deepseek': ['deepseek-chat', 'deepseek-coder', 'deepseek-reasoner'],
-        'openai': ['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo', 'gpt-4o'],
-        'gemini': ['gemini-pro', 'gemini-pro-vision', 'gemini-1.5-pro'],
+        'openai': ['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo', 'gpt-4o', 'o1-preview', 'o1-mini'],
+        'gemini': ['gemini-pro', 'gemini-pro-vision', 'gemini-1.5-pro', 'gemini-2.0-flash-exp'],
+        'openrouter': [
+          'openai/gpt-4o',
+          'openai/gpt-4o-mini',
+          'openai/o1-preview',
+          'openai/o1-mini',
+          'anthropic/claude-3.5-sonnet',
+          'anthropic/claude-3.5-haiku',
+          'google/gemini-pro-1.5',
+          'google/gemini-2.0-flash-exp',
+          'deepseek/deepseek-reasoner',
+          'deepseek/deepseek-chat',
+          'qwen/qwen-2.5-72b-instruct',
+          'meta-llama/llama-3.1-70b-instruct',
+        ],
       };
 
       let models = defaultModels[this.config.provider] || [];
@@ -191,22 +224,36 @@ export class LLMService {
       maxTokens: options?.maxTokens ?? this.config.maxTokens ?? 4096,
       topP: options?.topP ?? this.config.topP ?? 0.95,
       stream: true,
+      reasoningTokens: options?.reasoningTokens ?? this.config.reasoningTokens,
     };
 
     try {
-      const stream = await this.client.chat.completions.create({
+      const requestParams: any = {
         model: finalOptions.model,
         messages: messages as any,
         temperature: finalOptions.temperature,
         max_tokens: finalOptions.maxTokens,
         top_p: finalOptions.topP,
         stream: true,
-      });
+      };
 
-      for await (const chunk of stream) {
-        const content = chunk.choices[0]?.delta?.content || '';
-        if (content) {
-          onChunk(content);
+      // 如果支持思维链，添加 reasoning_tokens 参数
+      if (finalOptions.reasoningTokens) {
+        requestParams.max_completion_tokens = finalOptions.reasoningTokens;
+        // 对于 OpenRouter，可能还需要其他参数
+        if (this.config?.provider === 'openrouter') {
+          requestParams.reasoning_tokens = finalOptions.reasoningTokens;
+        }
+      }
+
+      const stream = await this.client.chat.completions.create(requestParams as any);
+
+      if (stream) {
+        for await (const chunk of stream as any) {
+          const content = chunk.choices[0]?.delta?.content || '';
+          if (content) {
+            onChunk(content);
+          }
         }
       }
     } catch (error) {

@@ -48,7 +48,7 @@ export interface CustomProvider {
 
 // ===== 用户配置 =====
 export interface UserConfig {
-  provider: 'deepseek' | 'openai' | 'gemini' | 'custom';
+  provider: 'deepseek' | 'openai' | 'gemini' | 'openrouter' | 'custom';
   apiKey: string;
   baseURL?: string;
   model: string;
@@ -56,6 +56,7 @@ export interface UserConfig {
   maxTokens?: number;
   topP?: number;
   customProviderId?: string; // 当provider为custom时使用
+  reasoningTokens?: number; // 思维链预算token
 }
 
 // ===== Agent响应 =====
@@ -78,6 +79,7 @@ export interface LLMOptions {
   maxTokens?: number;
   topP?: number;
   stream?: boolean;
+  reasoningTokens?: number; // 思维链预算token
 }
 
 // ===== Agent配置 =====

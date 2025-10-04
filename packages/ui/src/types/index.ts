@@ -37,7 +37,7 @@ export interface CustomProvider {
  * 用户配置
  */
 export interface UserConfig {
-  provider: 'deepseek' | 'openai' | 'gemini' | 'custom';
+  provider: 'deepseek' | 'openai' | 'gemini' | 'openrouter' | 'custom';
   apiKey: string;
   baseURL?: string;
   model: string;
@@ -45,6 +45,7 @@ export interface UserConfig {
   maxTokens: number;
   topP: number;
   customProviderId?: string;
+  reasoningTokens?: number; // 思维链预算token
 }
 
 /**

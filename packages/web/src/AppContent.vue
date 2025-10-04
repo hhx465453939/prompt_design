@@ -13,6 +13,9 @@
       @copy-md="copyMarkdown()"
       @load-session="handleLoadSession"
       @copy-message="handleCopyMessage"
+      @free-chat="handleFreeChat"
+      @test-prompt="handleTestPrompt"
+      @update-loading="chatStore.loading.value = $event"
     />
 
     <!-- 配置面板 -->
@@ -335,6 +338,83 @@ ${message.content}`;
     console.error('复制失败:', error);
     message.error('复制失败');
   }
+};
+
+/**
+ * 处理自由聊天
+ */
+const handleFreeChat = async (prompt: string) => {
+  // 确保服务已初始化
+  if (!llmService) {
+    const success = initializeServices();
+    if (!success) {
+      message.error('服务初始化失败，请检查配置');
+      return;
+    }
+  }
+
+  if (!llmService.isInitialized()) {
+    message.error('请先配置API密钥');
+    return;
+  }
+
+  try {
+    chatStore.addLoadingMessage();
+    chatStore.loading.value = true;
+
+    // 添加用户消息
+    chatStore.addUserMessage(prompt);
+    chatStore.removeLoadingMessage();
+
+    // 创建流式响应消息
+    const streamingMsg = chatStore.addAssistantMessage('', {
+      agentType: 'CONDUCTOR',
+      intent: 'CHAT',
+      streaming: true,
+    });
+
+    // 直接调用LLM服务
+    let accumulatedContent = '';
+    await llmService.chatStream(
+      [{ role: 'user', content: prompt }], 
+      (chunk: string) => {
+        accumulatedContent += chunk;
+        streamingMsg.content = accumulatedContent;
+        // 强制触发响应式更新
+        const messageIndex = chatStore.messages.value.findIndex(m => m.id === streamingMsg.id);
+        if (messageIndex !== -1) {
+          chatStore.messages.value = [...chatStore.messages.value];
+        }
+      },
+      {
+        // 传递 reasoning tokens 配置
+        reasoningTokens: configStore.config.value.reasoningTokens,
+      }
+    );
+
+    // 完成
+    streamingMsg.streaming = false;
+    streamingMsg.content = accumulatedContent;
+    console.log('✅ 自由聊天完成');
+
+  } catch (error) {
+    console.error('❌ 自由聊天失败:', error);
+    chatStore.removeLoadingMessage();
+    chatStore.addErrorMessage('请求失败: ' + (error as Error).message);
+  } finally {
+    chatStore.loading.value = false;
+  }
+};
+
+/**
+ * 处理测试提示词
+ */
+const handleTestPrompt = (prompt: string) => {
+  // 显示提示信息
+  message.info(`🧪 已切换到自由聊天模式，正在测试提示词...`);
+  
+  // 直接调用自由聊天处理
+  handleFreeChat(prompt);
 };
 
 /**
