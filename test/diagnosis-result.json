@@ -1,0 +1,10 @@
+{
+  "timestamp": "2025-10-04T03:31:13.380Z",
+  "envVars": {},
+  "files": [
+    ".env.local",
+    "env.example"
+  ],
+  "issues": [],
+  "hasAPIKey": true
+}

@@ -1,0 +1,30 @@
+{
+  "timestamp": "2025-10-04T05:02:46.861Z",
+  "testType": "real-api-diagnosis",
+  "apiStatus": {
+    "apiKeyValid": true,
+    "baseURL": "https://api.deepseek.com",
+    "connectionWorking": true
+  },
+  "performance": {
+    "basicAPI": "正常",
+    "streamAPI": {
+      "status": "正常",
+      "firstChunkDelay": 869,
+      "totalChunks": 500,
+      "totalTime": 20486,
+      "avgChunkTime": 40.972
+    },
+    "frontendSimulation": {
+      "status": "正常",
+      "responseTime": 9645,
+      "responseLength": 364
+    }
+  },
+  "issues": [
+    "流式响应时间过长（>10秒）"
+  ],
+  "recommendations": [
+    "建议检查网络连接或API响应速度"
+  ]
+}

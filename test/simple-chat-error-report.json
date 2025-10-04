@@ -1,0 +1,11 @@
+{
+  "timestamp": "2025-10-04T04:12:36.425Z",
+  "testType": "simple-core-chat-test",
+  "success": false,
+  "error": "401 Authentication Fails, Your api key: ****here is invalid",
+  "stack": "Error: 401 Authentication Fails, Your api key: ****here is invalid\n    at APIError.generate (E:\\Development\\prompt_design\\node_modules\\.pnpm\\openai@4.104.0_zod@3.25.76\\node_modules\\openai\\error.js:48:20)\n    at OpenAI.makeStatusError (E:\\Development\\prompt_design\\node_modules\\.pnpm\\openai@4.104.0_zod@3.25.76\\node_modules\\openai\\core.js:302:33)\n    at OpenAI.makeRequest (E:\\Development\\prompt_design\\node_modules\\.pnpm\\openai@4.104.0_zod@3.25.76\\node_modules\\openai\\core.js:346:30)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async testSimpleChat (file:///E:/Development/prompt_design/test/test-simple-chat.mjs:81:27)",
+  "environment": {
+    "hasAPIKey": true,
+    "hasBaseURL": true
+  }
+}

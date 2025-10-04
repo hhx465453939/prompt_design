@@ -1,0 +1,11 @@
+{
+  "timestamp": "2025-10-04T04:14:44.510Z",
+  "testType": "real-api-diagnosis",
+  "success": false,
+  "error": "logger.debug is not a function",
+  "stack": "TypeError: logger.debug is not a function\n    at testRealAPI (file:///E:/Development/prompt_design/test/test-real-api.mjs:115:18)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)",
+  "apiStatus": {
+    "apiKeyValid": false,
+    "error": "logger.debug is not a function"
+  }
+}

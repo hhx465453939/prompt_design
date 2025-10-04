@@ -1,0 +1,7 @@
+{
+  "timestamp": "2025-10-04T03:31:13.806Z",
+  "testType": "simple",
+  "success": false,
+  "error": "Dynamic require of \"path\" is not supported",
+  "hasAPIKey": true
+}

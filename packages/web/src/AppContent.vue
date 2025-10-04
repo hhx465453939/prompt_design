@@ -170,7 +170,13 @@ const handleSend = async (text: string, selectedAgent?: string) => {
     const meta = await routerService!.handleRequestStream(
       text,
       (chunk: string) => {
-        streamingMsg.content += chunk;
+        // 使用chatStore的方法更新消息内容
+        const messageIndex = chatStore.messages.value.findIndex(m => m.id === streamingMsg.id);
+        if (messageIndex !== -1) {
+          chatStore.messages.value[messageIndex].content += chunk;
+          // 强制触发响应式更新
+          chatStore.messages.value = [...chatStore.messages.value];
+        }
       },
       {
         metadata: {

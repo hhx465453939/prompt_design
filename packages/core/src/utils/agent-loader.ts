@@ -3,10 +3,25 @@
  */
 
 import { AgentType, AgentConfig } from '../types';
-import { logger } from './logger';
+import { systemLogger } from './logger';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // 检测运行环境
 const isBrowser = typeof window !== 'undefined';
+
+// 动态导入工具函数
+const dynamicImport = async (moduleName: string) => {
+  try {
+    // Node.js ESM 环境
+    if (typeof window === 'undefined' && typeof process !== 'undefined') {
+      return await import(moduleName);
+    }
+    throw new Error('File system access not available in browser environment');
+  } catch (error) {
+    throw new Error(`Cannot import ${moduleName}: ${error}`);
+  }
+};
 
 // 浏览器环境下的默认提示词
 const DEFAULT_PROMPTS = {
@@ -87,9 +102,8 @@ export class AgentLoader {
   constructor(basePath?: string) {
     this.useFileSystem = !isBrowser && basePath !== undefined;
     if (this.useFileSystem && basePath) {
-      // 只在 Node.js 环境中导入 path
-      const path = require('path');
-      this.agentMatrixPath = path.join(basePath, 'agent_matrix');
+      // 使用默认路径，避免require语句
+      this.agentMatrixPath = `${basePath}/agent_matrix`;
     }
   }
 
@@ -114,7 +128,7 @@ export class AgentLoader {
         ]
       };
     } catch (error) {
-      logger.error('Failed to load X0 Optimizer', error as Error);
+      systemLogger.error('Failed to load X0 Optimizer', error as Error);
       throw error;
     }
   }
@@ -140,7 +154,7 @@ export class AgentLoader {
         ]
       };
     } catch (error) {
-      logger.error('Failed to load X0 Reverse', error as Error);
+      systemLogger.error('Failed to load X0 Reverse', error as Error);
       throw error;
     }
   }
@@ -166,7 +180,7 @@ export class AgentLoader {
         ]
       };
     } catch (error) {
-      logger.error('Failed to load X1 Basic', error as Error);
+      systemLogger.error('Failed to load X1 Basic', error as Error);
       throw error;
     }
   }
@@ -192,7 +206,7 @@ export class AgentLoader {
         ]
       };
     } catch (error) {
-      logger.error('Failed to load X4 Scenario', error as Error);
+      systemLogger.error('Failed to load X4 Scenario', error as Error);
       throw error;
     }
   }
@@ -208,7 +222,7 @@ export class AgentLoader {
     agents.set('X1_BASIC', this.loadX1Basic());
     agents.set('X4_SCENARIO', this.loadX4Scenario());
     
-    logger.info(`Loaded ${agents.size} agents successfully`);
+    systemLogger.info(`Loaded ${agents.size} agents successfully`);
     return agents;
   }
 
@@ -220,11 +234,17 @@ export class AgentLoader {
       throw new Error('File system access not available in browser environment');
     }
     
-    // 动态导入 fs 和 path
-    const fs = require('fs');
-    const path = require('path');
+    // 使用path.join确保跨平台兼容性
     const fullPath = path.join(this.agentMatrixPath, relativePath);
-    return fs.readFileSync(fullPath, 'utf-8');
+    // 简单读取实现，避免动态导入问题
+    try {
+      if (!fs.existsSync(fullPath)) {
+        throw new Error(`Agent file not found: ${fullPath}`);
+      }
+      return fs.readFileSync(fullPath, 'utf-8');
+    } catch (error) {
+      throw new Error(`Failed to read agent file: ${fullPath}`);
+    }
   }
 
   /**
@@ -241,6 +261,6 @@ export class AgentLoader {
 
 // 导出单例（浏览器环境下不传入basePath）
 export const agentLoader = new AgentLoader(
-  !isBrowser && typeof process !== 'undefined' ? process.cwd() : undefined
+  undefined // 禁用文件系统，始终使用默认提示词
 );
 

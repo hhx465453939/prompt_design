@@ -22,7 +22,7 @@ export class LLMService {
       case 'deepseek':
         this.client = new OpenAI({
           apiKey: config.apiKey,
-          baseURL: config.baseURL || 'https://api.deepseek.com',
+          baseURL: config.baseURL || 'https://api.deepseek.com/v1',
           dangerouslyAllowBrowser: true, // 允许浏览器环境
         });
         break;

@@ -1,0 +1,8 @@
+{
+  "timestamp": "2025-10-04T03:31:37.086Z",
+  "testType": "direct",
+  "success": true,
+  "content": "你好！我是DeepSeek，很高兴认识你！😊\n\n我是由深度求索公司创造的AI助手，致力于为大家提供热情、细腻的帮助。让我简单介绍一下自己的特点：\n\n**我的能力：**\n- 💬 纯文本对话，可以回答各种问题、协助写作、分析问题等\n- 📁 支持文件上传功能，能处理图像、txt、pdf、ppt、word、excel等文件中的文字信息\n- 🔍 支持联网搜索（",
+  "tokensUsed": 110,
+  "hasAPIKey": true
+}
