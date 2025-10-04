@@ -28,12 +28,18 @@
         </n-form-item>
 
         <!-- API Key -->
+        <n-form-item v-if="formData.provider === 'custom' && formData.customProviderId" label="当前供应商" path="currentProvider">
+          <n-alert type="info" :show-icon="false">
+            🔌 {{ CoreCustomProviderManager.getProvider(formData.customProviderId)?.name || '自定义供应商' }}
+          </n-alert>
+        </n-form-item>
+
         <n-form-item label="API Key" path="apiKey">
           <n-input
             v-model:value="formData.apiKey"
             type="password"
             show-password-on="click"
-            placeholder="输入 API Key"
+            :placeholder="formData.provider === 'custom' ? '自定义供应商 API Key' : '输入 API Key'"
           />
         </n-form-item>
 
@@ -174,6 +180,7 @@ import {
   NCollapse,
   NCollapseItem,
   NText,
+  NAlert,
   useMessage,
 } from 'naive-ui';
 import type { UserConfig } from '../types';
@@ -300,7 +307,13 @@ const handleProviderChange = (value: string) => {
       formData.value.provider = 'custom';
       formData.value.customProviderId = providerId;
       formData.value.baseURL = provider.baseURL;
+      formData.value.apiKey = provider.apiKey || '';
       availableModels.value = provider.models;
+      
+      // 如果有模型列表，自动设置第一个为默认模型
+      if (provider.models.length > 0 && !formData.value.model) {
+        formData.value.model = provider.models[0];
+      }
     }
   } else {
     // 切换到预设供应商

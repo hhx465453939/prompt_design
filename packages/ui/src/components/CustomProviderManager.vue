@@ -24,6 +24,15 @@
               />
             </n-form-item>
 
+            <n-form-item label="API Key" path="apiKey">
+              <n-input
+                v-model:value="formData.apiKey"
+                type="password"
+                show-password-on="click"
+                placeholder="输入该供应商的 API Key"
+              />
+            </n-form-item>
+
             <n-form-item label="模型列表" path="models">
               <n-input
                 v-model:value="modelsText"
@@ -151,6 +160,7 @@ const visible = computed({
 const formData = ref({
   name: '',
   baseURL: '',
+  apiKey: '',
 });
 
 const modelsText = ref('');
@@ -171,6 +181,11 @@ const rules = {
     message: '请输入 Base URL',
     trigger: 'blur',
     pattern: /^https?:\/\/.+/,
+  },
+  apiKey: {
+    required: true,
+    message: '请输入 API Key',
+    trigger: 'blur',
   },
 };
 
@@ -200,35 +215,12 @@ const fetchProviderModels = async () => {
 
   fetchingModels.value = true;
   try {
-    // 创建临时配置进行测试
-    const tempConfig = {
-      provider: 'custom' as const,
-      apiKey: 'test-key', // 临时测试key
-      baseURL: formData.value.baseURL,
-      model: 'test-model',
-      customProviderId: 'temp-fetch-models',
-    };
+    // 使用CustomProviderManager的静态方法获取模型列表
+    const models = await CustomProviderManager.fetchModels(
+      formData.value.baseURL,
+      formData.value.apiKey
+    );
 
-    const llmService = new LLMService();
-    
-    // 创建临时自定义供应商用于获取模型
-    const tempProvider: CustomProvider = {
-      id: 'temp-fetch-models',
-      name: formData.value.name,
-      baseURL: formData.value.baseURL,
-      models: [],
-      createdAt: Date.now(),
-    };
-
-    // 临时保存供应商用于获取模型
-    CustomProviderManager.addProvider(tempProvider);
-    
-    await llmService.initialize(tempConfig);
-    const models = await llmService.getAvailableModels();
-    
-    // 删除临时供应商
-    CustomProviderManager.deleteProvider('temp-fetch-models');
-    
     if (models.length > 0) {
       modelsText.value = models.join('\n');
       parsedModels.value = models;
@@ -237,8 +229,7 @@ const fetchProviderModels = async () => {
       message.warning('未能获取到模型列表，请手动输入');
     }
   } catch (error) {
-    // 清理临时供应商
-    CustomProviderManager.deleteProvider('temp-fetch-models');
+    console.error('Failed to fetch models:', error);
     message.warning(`获取模型失败: ${(error as Error).message}，请手动输入模型名称`);
   } finally {
     fetchingModels.value = false;
@@ -252,39 +243,15 @@ const testProvider = async () => {
 
   testing.value = true;
   try {
-    // 创建临时配置进行测试
-    const tempConfig = {
-      provider: 'custom' as const,
-      apiKey: 'test-key', // 临时测试key
-      baseURL: formData.value.baseURL,
-      model: 'test-model',
-      customProviderId: 'temp-test',
-    };
-
-    const llmService = new LLMService();
-    
-    // 创建临时自定义供应商用于测试
-    const tempProvider: CustomProvider = {
-      id: 'temp-test',
-      name: formData.value.name,
-      baseURL: formData.value.baseURL,
-      models: ['test-model'],
-      createdAt: Date.now(),
-    };
-
-    // 临时保存供应商用于测试
-    CustomProviderManager.addProvider(tempProvider);
-    
-    await llmService.initialize(tempConfig);
-    await llmService.testConnection();
-    
-    // 删除临时供应商
-    CustomProviderManager.deleteProvider('temp-test');
+    // 使用CustomProviderManager的静态方法测试连接
+    await CustomProviderManager.testConnection(
+      formData.value.baseURL,
+      formData.value.apiKey
+    );
     
     message.success('连接测试成功！');
   } catch (error) {
-    // 清理临时供应商
-    CustomProviderManager.deleteProvider('temp-test');
+    console.error('Connection test failed:', error);
     message.error(`连接测试失败: ${(error as Error).message}`);
   } finally {
     testing.value = false;
@@ -302,6 +269,7 @@ const saveProvider = () => {
     const providerData = {
       name: formData.value.name,
       baseURL: formData.value.baseURL,
+      apiKey: formData.value.apiKey,
       models: parsedModels.value,
     };
 
@@ -331,6 +299,7 @@ const editProvider = (provider: CustomProvider) => {
   formData.value = {
     name: provider.name,
     baseURL: provider.baseURL,
+    apiKey: provider.apiKey || '',
   };
   modelsText.value = provider.models.join('\n');
   parsedModels.value = provider.models;
@@ -351,6 +320,7 @@ const resetForm = () => {
   formData.value = {
     name: '',
     baseURL: '',
+    apiKey: '',
   };
   modelsText.value = '';
   parsedModels.value = [];

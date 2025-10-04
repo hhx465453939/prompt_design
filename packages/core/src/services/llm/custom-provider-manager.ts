@@ -3,6 +3,7 @@
  */
 
 import { CustomProvider } from '../../types';
+import OpenAI from 'openai';
 
 export class CustomProviderManager {
   private static STORAGE_KEY = 'prompt-matrix-custom-providers';
@@ -81,6 +82,47 @@ export class CustomProviderManager {
     }
   }
   
+  /**
+   * 测试供应商连接
+   */
+  static async testConnection(baseURL: string, apiKey: string): Promise<boolean> {
+    try {
+      const openai = new OpenAI({
+        apiKey,
+        baseURL,
+        dangerouslyAllowBrowser: true,
+      });
+
+      await openai.chat.completions.create({
+        model: 'test-model',
+        messages: [{ role: 'user', content: 'test' }],
+        max_tokens: 1,
+      });
+      
+      return true;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * 获取供应商的模型列表
+   */
+  static async fetchModels(baseURL: string, apiKey: string): Promise<string[]> {
+    try {
+      const openai = new OpenAI({
+        apiKey,
+        baseURL,
+        dangerouslyAllowBrowser: true,
+      });
+
+      const response = await openai.models.list();
+      return response.data.map((model: any) => model.id);
+    } catch (error) {
+      throw error;
+    }
+  }
+
   /**
    * 生成唯一ID
    */
