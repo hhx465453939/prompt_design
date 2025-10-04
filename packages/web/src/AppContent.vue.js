@@ -98,8 +98,16 @@ const handleSend = async (text, selectedAgent) => {
             thinkingProcess: '解析意图中…\n\n- 检测是否为完整提示词\n- 判断是否为优化请求\n- 场景/基础设计分流',
         });
         // 真实流式：调用流式接口
+        let accumulatedContent = '';
         const meta = await routerService.handleRequestStream(text, (chunk) => {
-            streamingMsg.content += chunk;
+            accumulatedContent += chunk;
+            // 使用chatStore的方法更新消息内容
+            const messageIndex = chatStore.messages.value.findIndex(m => m.id === streamingMsg.id);
+            if (messageIndex !== -1) {
+                chatStore.messages.value[messageIndex].content = accumulatedContent;
+                // 强制触发响应式更新
+                chatStore.messages.value = [...chatStore.messages.value];
+            }
         }, {
             metadata: {
                 forcedAgent: selectedAgent === 'AUTO' ? undefined : selectedAgent,
@@ -109,6 +117,8 @@ const handleSend = async (text, selectedAgent) => {
         streamingMsg.streaming = false;
         streamingMsg.agentType = meta.agentType;
         streamingMsg.intent = meta.intent;
+        // 确保最终内容是完整的
+        streamingMsg.content = accumulatedContent;
         console.log('✅ Response received:', {
             agent: meta.agentType,
             intent: meta.intent,

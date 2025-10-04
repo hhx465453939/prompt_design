@@ -167,13 +167,15 @@ const handleSend = async (text: string, selectedAgent?: string) => {
     });
 
     // 真实流式：调用流式接口
+    let accumulatedContent = '';
     const meta = await routerService!.handleRequestStream(
       text,
       (chunk: string) => {
+        accumulatedContent += chunk;
         // 使用chatStore的方法更新消息内容
         const messageIndex = chatStore.messages.value.findIndex(m => m.id === streamingMsg.id);
         if (messageIndex !== -1) {
-          chatStore.messages.value[messageIndex].content += chunk;
+          chatStore.messages.value[messageIndex].content = accumulatedContent;
           // 强制触发响应式更新
           chatStore.messages.value = [...chatStore.messages.value];
         }
@@ -189,6 +191,8 @@ const handleSend = async (text: string, selectedAgent?: string) => {
     streamingMsg.streaming = false;
     streamingMsg.agentType = meta.agentType;
     streamingMsg.intent = meta.intent;
+    // 确保最终内容是完整的
+    streamingMsg.content = accumulatedContent;
 
     console.log('✅ Response received:', {
       agent: meta.agentType,

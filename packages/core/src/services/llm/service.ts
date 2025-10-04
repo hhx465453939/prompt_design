@@ -4,8 +4,9 @@
  */
 
 import OpenAI from 'openai';
-import { Message, LLMOptions, UserConfig } from '../../types';
+import { Message, LLMOptions, UserConfig, CustomProvider } from '../../types';
 import { logger } from '../../utils/logger';
+import { CustomProviderManager } from './custom-provider-manager';
 
 export class LLMService {
   private client: OpenAI | null = null;
@@ -39,6 +40,22 @@ export class LLMService {
         this.client = new OpenAI({
           apiKey: config.apiKey,
           baseURL: config.baseURL || 'https://generativelanguage.googleapis.com/v1beta',
+          dangerouslyAllowBrowser: true,
+        });
+        break;
+      
+      case 'custom':
+        if (!config.customProviderId) {
+          throw new Error('Custom provider ID is required when provider is "custom"');
+        }
+        const customProvider = CustomProviderManager.getProvider(config.customProviderId);
+        if (!customProvider) {
+          throw new Error(`Custom provider not found: ${config.customProviderId}`);
+        }
+        
+        this.client = new OpenAI({
+          apiKey: config.apiKey,
+          baseURL: customProvider.baseURL,
           dangerouslyAllowBrowser: true,
         });
         break;
@@ -85,12 +102,20 @@ export class LLMService {
     try {
       // 根据provider返回默认模型列表
       const defaultModels: Record<string, string[]> = {
-        'deepseek': ['deepseek-chat', 'deepseek-coder'],
-        'openai': ['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo'],
-        'gemini': ['gemini-pro', 'gemini-pro-vision'],
+        'deepseek': ['deepseek-chat', 'deepseek-coder', 'deepseek-reasoner'],
+        'openai': ['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo', 'gpt-4o'],
+        'gemini': ['gemini-pro', 'gemini-pro-vision', 'gemini-1.5-pro'],
       };
 
       let models = defaultModels[this.config.provider] || [];
+      
+      // 如果是自定义供应商，使用其预定义的模型列表
+      if (this.config.provider === 'custom' && this.config.customProviderId) {
+        const customProvider = CustomProviderManager.getProvider(this.config.customProviderId);
+        if (customProvider) {
+          models = customProvider.models;
+        }
+      }
 
       // 尝试从API获取模型列表（如果支持的话）
       try {

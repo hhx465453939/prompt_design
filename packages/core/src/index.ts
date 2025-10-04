@@ -12,6 +12,7 @@ export { RouterService } from './services/router/service';
 export { AgentManager } from './services/agent/manager';
 export { PromptManager } from './services/prompt/manager';
 export { StorageService } from './services/storage/service';
+export { CustomProviderManager } from './services/llm/custom-provider-manager';
 
 // Agent导出
 export { ConductorAgent } from './agents/conductor';

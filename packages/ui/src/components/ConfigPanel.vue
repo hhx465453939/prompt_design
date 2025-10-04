@@ -9,11 +9,22 @@
       >
         <!-- 模型提供商 -->
         <n-form-item label="模型提供商" path="provider">
-          <n-select
-            v-model:value="formData.provider"
-            :options="providerOptions"
-            placeholder="选择模型提供商"
-          />
+          <n-space vertical style="width: 100%;">
+            <n-select
+              :value="getProviderValue()"
+              :options="providerOptions"
+              placeholder="选择模型提供商"
+              @update:value="handleProviderChange"
+            />
+            <n-button 
+              type="info" 
+              dashed 
+              size="small" 
+              @click="showCustomProviderManager = true"
+            >
+              🔧 管理自定义供应商
+            </n-button>
+          </n-space>
         </n-form-item>
 
         <!-- API Key -->
@@ -136,10 +147,17 @@
       </template>
     </n-drawer-content>
   </n-drawer>
+
+  <!-- 自定义供应商管理器 -->
+  <CustomProviderManager
+    :show="showCustomProviderManager"
+    @update:show="showCustomProviderManager = $event"
+    @provider-saved="handleCustomProviderSaved"
+  />
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue';
+import { ref, watch, computed, nextTick } from 'vue';
 import {
   NDrawer,
   NDrawerContent,
@@ -159,7 +177,8 @@ import {
   useMessage,
 } from 'naive-ui';
 import type { UserConfig } from '../types';
-import { LLMService } from '@prompt-matrix/core';
+import { LLMService, CustomProviderManager as CoreCustomProviderManager } from '@prompt-matrix/core';
+import CustomProviderManager from './CustomProviderManager.vue';
 
 interface Props {
   show: boolean;
@@ -185,16 +204,36 @@ const visible = ref(props.show);
 const formRef = ref();
 
 // 提供商选项
-const providerOptions = [
-  { label: 'DeepSeek', value: 'deepseek' },
-  { label: 'OpenAI', value: 'openai' },
-  { label: 'Gemini', value: 'gemini' },
-];
+const providerOptions = computed(() => {
+  const options = [
+    { label: 'DeepSeek', value: 'deepseek' },
+    { label: 'OpenAI', value: 'openai' },
+    { label: 'Gemini', value: 'gemini' },
+  ];
+  
+  // 添加自定义供应商选项
+  const customProviders = CoreCustomProviderManager.getProviders();
+  if (customProviders.length > 0) {
+    options.push(
+      { label: '──────────', value: 'divider' } as any,
+      { label: '🔧 自定义供应商', value: 'divider' } as any,
+      ...customProviders.map(provider => ({
+        label: `🔌 ${provider.name}`,
+        value: `custom_${provider.id}`,
+      }))
+    );
+  }
+  
+  return options;
+});
 
 // 测试连接和模型相关状态
 const testingConnection = ref(false);
 const loadingModels = ref(false);
 const availableModels = ref<string[]>([]);
+
+// 自定义供应商管理器状态
+const showCustomProviderManager = ref(false);
 
 // 模型选择选项
 const modelSelectOptions = computed(() => {
@@ -249,6 +288,45 @@ const loadModels = async () => {
   } finally {
     loadingModels.value = false;
   }
+};
+
+// 处理供应商变更
+const handleProviderChange = (value: string) => {
+  if (value.startsWith('custom_')) {
+    // 切换到自定义供应商
+    const providerId = value.replace('custom_', '');
+    const provider = CoreCustomProviderManager.getProvider(providerId);
+    if (provider) {
+      formData.value.provider = 'custom';
+      formData.value.customProviderId = providerId;
+      formData.value.baseURL = provider.baseURL;
+      availableModels.value = provider.models;
+    }
+  } else {
+    // 切换到预设供应商
+    formData.value.provider = value as any;
+    formData.value.customProviderId = undefined;
+    availableModels.value = [];
+  }
+};
+
+// 自定义供应商保存成功处理
+const handleCustomProviderSaved = (provider: any) => {
+  message.success(`自定义供应商 "${provider.name}" 保存成功！`);
+  // 刷新供应商选项 - 强制触发computed重新计算
+  const temp = providerOptions.value;
+  nextTick(() => {
+    // 重新计算providerOptions以包含新添加的供应商
+    providerOptions.value;
+  });
+};
+
+// 获取当前供应商值（用于v-model）
+const getProviderValue = () => {
+  if (formData.value.provider === 'custom' && formData.value.customProviderId) {
+    return `custom_${formData.value.customProviderId}`;
+  }
+  return formData.value.provider;
 };
 
 // 验证规则

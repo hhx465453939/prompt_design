@@ -9,6 +9,7 @@ export { default as MessageItem } from './components/MessageItem.vue';
 export { default as InputBox } from './components/InputBox.vue';
 export { default as ConfigPanel } from './components/ConfigPanel.vue';
 export { default as AgentIndicator } from './components/AgentIndicator.vue';
+export { default as CustomProviderManager } from './components/CustomProviderManager.vue';
 
 // 类型导出
 export * from './types';

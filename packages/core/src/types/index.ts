@@ -33,15 +33,29 @@ export interface RequestContext {
   metadata?: Record<string, any>;
 }
 
+// ===== 自定义供应商 =====
+export interface CustomProvider {
+  id: string;
+  name: string;
+  baseURL: string;
+  models: string[];
+  apiKey?: string;
+  temperature?: number;
+  maxTokens?: number;
+  topP?: number;
+  createdAt: number;
+}
+
 // ===== 用户配置 =====
 export interface UserConfig {
-  provider: 'deepseek' | 'openai' | 'gemini';
+  provider: 'deepseek' | 'openai' | 'gemini' | 'custom';
   apiKey: string;
   baseURL?: string;
   model: string;
   temperature?: number;
   maxTokens?: number;
   topP?: number;
+  customProviderId?: string; // 当provider为custom时使用
 }
 
 // ===== Agent响应 =====

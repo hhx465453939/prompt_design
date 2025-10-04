@@ -11,23 +11,33 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### 开发命令
 ```bash
 # 完整开发流程（推荐）
-pnpm dev                 # 构建core → 启动web开发服务器
+pnpm dev                 # 并行构建core → ui → 启动web开发服务器
+
+# 单独开发
+pnpm dev:core            # 开发模式构建core（监听文件变化）
+pnpm dev:ui              # 开发模式构建ui（监听文件变化）
+pnpm dev:web             # 启动web开发服务器
 
 # 单独构建
-pnpm build:core          # 构建核心服务层
-pnpm build:ui            # 构建UI组件库
-pnpm build:web           # 构建Web应用
+pnpm build:core          # 构建核心服务层（tsup）
+pnpm build:ui            # 构建UI组件库（vue-tsc + vite）
+pnpm build:web           # 构建Web应用（vue-tsc + vite）
 pnpm build               # 构建所有包
 
 # 测试
-pnpm test                # 运行所有测试
+pnpm test                # 运行所有包的测试
 pnpm test:core           # 单独测试core包 (node test-core.mjs)
-pnpm -F @prompt-matrix/core test   # 单独测试core包
+pnpm -F @prompt-matrix/core test   # 使用vitest运行core包测试
+pnpm -F @prompt-matrix/core test:watch   # 监听模式运行测试
+pnpm -F @prompt-matrix/core test:coverage # 测试覆盖率报告
 
 # 清理
-pnpm clean               # 清理所有构建产物
-pnpm clean:dist          # 清理dist目录
-pnpm clean:vite          # 清理Vite缓存
+pnpm clean               # 清理所有构建产物和vite缓存
+pnpm clean:dist          # 清理packages/*/dist目录
+pnpm clean:vite          # 清理packages/*/node_modules/.vite目录
+
+# 代码检查
+pnpm -F @prompt-matrix/ui lint     # UI组件库代码检查和修复
 ```
 
 ### 调试
@@ -35,8 +45,11 @@ pnpm clean:vite          # 清理Vite缓存
 # 启用调试模式
 echo "DEBUG_MODE=true" > .env.local
 
-# 运行单个测试
+# 运行单个测试文件
 pnpm -F @prompt-matrix/core test src/services/router/service.test.ts
+
+# 测试特定功能
+node test-core.mjs       # 直接运行core包集成测试
 ```
 
 ## 项目架构
@@ -65,12 +78,17 @@ pnpm -F @prompt-matrix/core test src/services/router/service.test.ts
 - `RouterService`：智能路由服务
 - `AgentManager`：Agent生命周期管理
 - `PromptManager`：提示词CRUD管理
+- `StorageService`：数据存储服务
+- `CustomProviderManager`：自定义LLM提供商管理
 
 ### Agent矩阵配置
 Agent模板存储在`agent_matrix/`目录：
+- `agent_matrix/X0_reverse/` - 逆向分析工程师
+- `agent_matrix/X0_optimizer/sources/` - 优化师提示词
 - `agent_matrix/X1_basic/sources/` - 基础工程师提示词
 - `agent_matrix/X4_scenario/sources/` - 场景工程师提示词
-- `agent_matrix/X0_optimizer/sources/` - 优化师提示词
+- `agent_matrix/docs/` - 架构设计和变体目录
+- `agent_matrix/examples/` - 使用示例
 
 ## 开发流程
 
@@ -101,14 +119,20 @@ DEFAULT_EXPERT_MODEL=deepseek-chat
 ### 核心技术
 - **TypeScript 5.8+**：类型安全
 - **Node.js 18+**：运行环境
-- **pnpm 10.6+**：包管理
+- **pnpm 10.6+**：包管理（workspace）
 - **OpenAI SDK 4.83+**：大模型调用
+- **Vitest 3.0+**：单元测试框架
+- **tsup 8.0+**：TypeScript构建工具
 
 ### 前端技术
 - **Vue 3.5+**：UI框架
 - **Vite 6.x**：构建工具
-- **Naive UI 2.x**：组件库
-- **TypeScript**：类型支持
+- **Naive UI 2.40+**：组件库
+- **TypeScript 5.8+**：类型支持
+- **vue-tsc 2.2+**：Vue类型检查
+- **@vicons/ionicons5**：图标库
+- **highlight.js**：代码高亮
+- **marked**：Markdown解析
 
 ## 重要提醒
 
@@ -144,3 +168,5 @@ DEFAULT_EXPERT_MODEL=deepseek-chat
 - Agent加载失败：检查`agent_matrix/`目录结构
 - API调用失败：验证`.env.local`中的API密钥
 - 类型错误：运行`pnpm build:core`重新生成类型定义
+- 构建失败：确保所有依赖已安装（`pnpm install`）
+- 测试失败：检查test目录下的测试报告文件
