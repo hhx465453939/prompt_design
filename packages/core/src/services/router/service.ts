@@ -14,6 +14,7 @@ import { X0OptimizerAgent } from '../../agents/x0-optimizer';
 import { X0ReverseAgent } from '../../agents/x0-reverse';
 import { X1BasicAgent } from '../../agents/x1-basic';
 import { X4ScenarioAgent } from '../../agents/x4-scenario';
+import { CustomAgent, CustomAgentConfig } from '../../agents/custom-agent';
 import { LLMService } from '../llm/service';
 import { logger } from '../../utils/logger';
 
@@ -41,6 +42,16 @@ export class RouterService {
     this.agents.set('X4_SCENARIO', new X4ScenarioAgent(this.llmService));
     
     logger.info('All expert agents initialized');
+  }
+
+  /**
+   * 注册自定义Agent
+   */
+  registerCustomAgent(config: CustomAgentConfig) {
+    const agentType = `CUSTOM_${config.id}` as AgentType;
+    const customAgent = new CustomAgent(config, this.llmService);
+    this.agents.set(agentType, customAgent);
+    logger.info(`Custom agent registered: ${config.name} (${agentType})`);
   }
 
   /**
@@ -130,12 +141,15 @@ export class RouterService {
       metadata: context?.metadata || {},
     };
 
-    // 意图与路由
+    // 意图与路由（支持强制路由）
     onThinking?.('🔍 **意图分析**\n正在解析您的需求...');
-    const intent = await this.conductor.analyzeIntent(userInput, fullContext);
+    const forcedAgent = (fullContext as any).metadata?.forcedAgent as AgentType | undefined;
+    const intent = forcedAgent ? 'CHAT' : await this.conductor.analyzeIntent(userInput, fullContext);
     
     onThinking?.(`🎯 **意图识别**：${intent}\n\n🤔 **路由决策**\n正在选择最合适的专家Agent...`);
-    const decision = await this.conductor.makeRoutingDecision(intent, fullContext);
+    const decision = forcedAgent
+      ? { targetAgent: forcedAgent, intent, reasoning: 'Forced by user selection' }
+      : await this.conductor.makeRoutingDecision(intent, fullContext);
 
     const targetAgent = this.agents.get(decision.targetAgent);
     if (!targetAgent) {

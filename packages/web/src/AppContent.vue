@@ -16,6 +16,8 @@
       @free-chat="handleFreeChat"
       @test-prompt="handleTestPrompt"
       @update-loading="chatStore.loading.value = $event"
+      @regenerate="handleRegenerate"
+      @custom-agents-update="handleCustomAgentsUpdate"
     />
 
     <!-- 配置面板 -->
@@ -61,7 +63,7 @@ import {
   useMessage,
   useDialog,
 } from 'naive-ui';
-import { ChatWindow, ConfigPanel, useChatStore, useConfigStore } from '@prompt-matrix/ui';
+import { ChatWindow, ConfigPanel, useChatStore, useConfigStore, useChatHistory } from '@prompt-matrix/ui';
 import type { UserConfig as UIUserConfig } from '@prompt-matrix/ui';
 import { LLMService, RouterService } from '@prompt-matrix/core';
 // 导出/复制：取最后一条 AI 消息
@@ -90,6 +92,7 @@ import type { UserConfig as CoreUserConfig } from '@prompt-matrix/core';
 // 状态管理
 const chatStore = useChatStore();
 const configStore = useConfigStore();
+const { currentSession, clearAllSessions } = useChatHistory();
 const message = useMessage();
 const dialog = useDialog();
 
@@ -142,6 +145,20 @@ const initializeServices = () => {
 
     // 创建路由服务
     routerService = new RouterService(llmService);
+    
+    // 注册已保存的自定义Agent
+    const savedAgents = localStorage.getItem('custom-engineers');
+    if (savedAgents) {
+      try {
+        const agents = JSON.parse(savedAgents);
+        if (agents.length > 0) {
+          console.log('🔧 注册已保存的自定义Agent:', agents.length, '个');
+          registerCustomAgents(agents);
+        }
+      } catch (error) {
+        console.error('❌ 加载自定义Agent失败:', error);
+      }
+    }
 
     console.log('✅ Services initialized successfully');
     return true;
@@ -279,10 +296,17 @@ const handleClearHistory = () => {
     positiveText: '确定',
     negativeText: '取消',
     onPositiveClick: () => {
+      // 清空聊天存储
       chatStore.clearMessages();
+      
+      // 清空路由服务历史
       if (routerService) {
         routerService.clearHistory();
       }
+      
+      // 清空会话历史（关键修复）
+      clearAllSessions();
+      
       message.success('历史已清空');
     },
   });
@@ -353,7 +377,7 @@ const handleFreeChat = async (prompt: string) => {
     }
   }
 
-  if (!llmService.isInitialized()) {
+  if (!llmService!.isInitialized()) {
     message.error('请先配置API密钥');
     return;
   }
@@ -375,7 +399,7 @@ const handleFreeChat = async (prompt: string) => {
 
     // 直接调用LLM服务
     let accumulatedContent = '';
-    await llmService.chatStream(
+    await llmService!.chatStream(
       [{ role: 'user', content: prompt }], 
       (chunk: string) => {
         accumulatedContent += chunk;
@@ -415,6 +439,145 @@ const handleTestPrompt = (prompt: string) => {
   
   // 直接调用自由聊天处理
   handleFreeChat(prompt);
+};
+
+/**
+ * 处理自定义Agent更新
+ */
+const handleCustomAgentsUpdate = (agents: Array<{ id: string; name: string; prompt: string; expertise?: string; icon: string; color: string }>) => {
+  console.log('🔧 收到自定义Agent更新:', agents);
+  
+  registerCustomAgents(agents);
+};
+
+/**
+ * 注册自定义Agent到RouterService
+ */
+const registerCustomAgents = (agents: Array<{ id: string; name: string; prompt: string; expertise?: string; icon: string; color: string }>) => {
+  if (!routerService || !llmService) {
+    console.warn('⚠️ 服务未初始化，无法注册自定义Agent');
+    return;
+  }
+
+  try {
+    // 注册新的自定义Agent
+    agents.forEach(agent => {
+      const agentConfig = {
+        id: agent.id.startsWith('CUSTOM_') ? agent.id.replace('CUSTOM_', '') : agent.id, // 只移除一次前缀
+        name: agent.name,
+        prompt: agent.prompt,
+        expertise: agent.expertise,
+      };
+      
+      console.log('🔧 注册自定义Agent:', agentConfig.name);
+      routerService!.registerCustomAgent(agentConfig);
+    });
+    
+    console.log('✅ 自定义Agent注册完成');
+  } catch (error) {
+    console.error('❌ 自定义Agent注册失败:', error);
+  }
+};
+
+/**
+ * 处理重新生成
+ */
+const handleRegenerate = async (userMessage: string, originalAssistantMessage: any) => {
+  if (!routerService) {
+    const success = initializeServices();
+    if (!success) return;
+  }
+
+  try {
+    // 保存原始回复到历史记录
+    if (!originalAssistantMessage.alternatives) {
+      originalAssistantMessage.alternatives = [];
+    }
+    
+    // 创建新的回复对象（保存原始内容）
+    const originalCopy = { ...originalAssistantMessage };
+    delete originalCopy.alternatives; // 避免循环引用
+    
+    // 如果当前回复不在历史记录中，添加进去
+    const existsInHistory = originalAssistantMessage.alternatives.some(
+      (alt: any) => alt.content === originalAssistantMessage.content
+    );
+    
+    if (!existsInHistory) {
+      originalAssistantMessage.alternatives.unshift(originalCopy);
+    }
+    
+    // 移除加载中消息
+    chatStore.removeLoadingMessage();
+    
+    // 创建新的流式响应消息
+    const streamingMsg = chatStore.addAssistantMessage('', {
+      agentType: originalAssistantMessage.agentType,
+      intent: originalAssistantMessage.intent,
+      streaming: true,
+      thinkingProcess: '正在重新生成回复...',
+    });
+    
+    // 更新原始消息的内容为流式消息
+    originalAssistantMessage.content = '';
+    originalAssistantMessage.streaming = true;
+    
+    // 重新调用路由服务
+    let accumulatedContent = '';
+    let currentThinkingProcess = '正在重新生成回复...';
+    
+    const meta = await routerService!.handleRequestStream(
+      userMessage,
+      (chunk: string) => {
+        accumulatedContent += chunk;
+        originalAssistantMessage.content = accumulatedContent;
+        // 强制触发响应式更新
+        const messageIndex = chatStore.messages.value.findIndex(m => m.id === originalAssistantMessage.id);
+        if (messageIndex !== -1) {
+          chatStore.messages.value = [...chatStore.messages.value];
+        }
+      },
+      (thinkingChunk?: string) => {
+        if (thinkingChunk) {
+          currentThinkingProcess = thinkingChunk;
+          originalAssistantMessage.thinkingProcess = currentThinkingProcess;
+          // 强制触发响应式更新
+          const messageIndex = chatStore.messages.value.findIndex(m => m.id === originalAssistantMessage.id);
+          if (messageIndex !== -1) {
+            chatStore.messages.value = [...chatStore.messages.value];
+          }
+        }
+      },
+      {
+        metadata: {
+          forcedAgent: 'CONDUCTOR', // 重新生成时使用自动路由
+        },
+      }
+    );
+    
+    // 完成重新生成
+    originalAssistantMessage.streaming = false;
+    originalAssistantMessage.agentType = meta.agentType;
+    originalAssistantMessage.intent = meta.intent;
+    originalAssistantMessage.content = accumulatedContent;
+    originalAssistantMessage.thinkingProcess = undefined;
+    originalAssistantMessage.regenerationCount = (originalAssistantMessage.regenerationCount || 0) + 1;
+    
+    message.success('回复已重新生成');
+    
+  } catch (error) {
+    console.error('❌ 重新生成失败:', error);
+    
+    // 移除加载中消息
+    chatStore.removeLoadingMessage();
+    
+    // 添加错误消息
+    chatStore.addErrorMessage(
+      `重新生成失败: ${(error as Error).message}`
+    );
+    
+    message.error('重新生成失败，请查看错误详情');
+  }
 };
 
 /**

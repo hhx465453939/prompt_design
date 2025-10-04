@@ -16,6 +16,8 @@ export interface ChatMessage extends CoreMessage {
   isLoading?: boolean;
   streaming?: boolean;
   thinkingProcess?: string;
+  alternatives?: ChatMessage[]; // 历史回复列表
+  regenerationCount?: number; // 重新生成次数
 }
 
 /**

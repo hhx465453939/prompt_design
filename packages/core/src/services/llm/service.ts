@@ -218,14 +218,28 @@ export class LLMService {
       throw new Error('LLM Service not initialized.');
     }
 
+    // 根据提供商设置合适的默认 maxTokens
+    const defaultMaxTokens: Record<string, number> = {
+      deepseek: 4096,    // DeepSeek 最大 8192
+      openai: 4096,     // OpenAI 较高的限制
+      gemini: 4096,     // Gemini 合理的限制
+      openrouter: 4096, // OpenRouter 通用限制
+      custom: 4096,     // 自定义供应商通用限制
+    };
+
     const finalOptions: LLMOptions = {
       model: options?.model || this.config.model,
       temperature: options?.temperature ?? this.config.temperature ?? 0.7,
-      maxTokens: options?.maxTokens ?? this.config.maxTokens ?? 4096,
+      maxTokens: options?.maxTokens ?? this.config.maxTokens ?? defaultMaxTokens[this.config.provider] ?? 4096,
       topP: options?.topP ?? this.config.topP ?? 0.95,
       stream: true,
       reasoningTokens: options?.reasoningTokens ?? this.config.reasoningTokens,
     };
+
+    // 对于 DeepSeek，确保不超过 8192
+    if (this.config.provider === 'deepseek' && finalOptions.maxTokens && finalOptions.maxTokens > 8192) {
+      finalOptions.maxTokens = 8192;
+    }
 
     try {
       const requestParams: any = {

@@ -355,6 +355,8 @@ const loadModels = async () => {
 
 // 处理供应商变更
 const handleProviderChange = (value: string) => {
+  console.log('🔧 切换供应商:', value);
+  
   if (value.startsWith('custom_')) {
     // 切换到自定义供应商
     const providerId = value.replace('custom_', '');
@@ -373,9 +375,23 @@ const handleProviderChange = (value: string) => {
     }
   } else {
     // 切换到预设供应商
+    console.log('🔧 切换到预设供应商:', value);
+    
+    // 获取默认的 baseURL
+    const defaultBaseURLs: Record<string, string> = {
+      deepseek: 'https://api.deepseek.com/v1',
+      openai: 'https://api.openai.com/v1',
+      gemini: 'https://generativelanguage.googleapis.com/v1beta',
+      openrouter: 'https://openrouter.ai/api/v1',
+    };
+    
     formData.value.provider = value as any;
     formData.value.customProviderId = undefined;
+    // 重置 baseURL 为默认值
+    formData.value.baseURL = defaultBaseURLs[value] || '';
     availableModels.value = [];
+    
+    console.log('🔧 设置新的 baseURL:', formData.value.baseURL);
   }
 };
 

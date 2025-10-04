@@ -37,9 +37,10 @@
           type="error"
           :title="'错误'"
         >
-          {{ message.content }}
+          {{ currentContent }}
         </n-alert>
-        <div v-else class="message-text" v-html="renderMarkdown(message.content)" />
+        <div v-else-if="message.streaming" class="message-text" v-html="renderMarkdown(message.content)" />
+        <div v-else class="message-text" v-html="renderMarkdown(currentContent)" />
       </div>
 
       <!-- 消息底部元信息 -->
@@ -50,19 +51,64 @@
           </n-tag>
         </div>
         <div class="message-actions">
-          <!-- 只有助手消息才有测试按钮 -->
-          <n-button
-            v-if="message.role === 'assistant'"
-            quaternary
-            size="tiny"
-            circle
-            @click="handleTestAction"
-            title="在自由聊天中测试此提示词"
-          >
-            <template #icon>
-              <n-icon><FlaskOutline /></n-icon>
-            </template>
-          </n-button>
+          <!-- 只有助手消息才有额外功能 -->
+          <template v-if="message.role === 'assistant'">
+            <!-- 历史回复切换 -->
+            <div v-if="message.alternatives && message.alternatives.length > 0" class="history-navigation">
+              <n-button 
+                quaternary 
+                size="tiny" 
+                @click="handlePreviousAlternative"
+                :disabled="currentAlternativeIndex === 0"
+                title="上一个回复"
+              >
+                <template #icon>
+                  <n-icon><ChevronBackOutline /></n-icon>
+                </template>
+              </n-button>
+              <span class="alternative-counter">{{ currentAlternativeIndex + 1 }} / {{ message.alternatives.length + 1 }}</span>
+              <n-button 
+                quaternary 
+                size="tiny" 
+                @click="handleNextAlternative"
+                :disabled="currentAlternativeIndex === message.alternatives.length"
+                title="下一个回复"
+              >
+                <template #icon>
+                  <n-icon><ChevronForwardOutline /></n-icon>
+                </template>
+              </n-button>
+            </div>
+            
+            <!-- 重新生成按钮 -->
+            <n-button
+              quaternary
+              size="tiny"
+              circle
+              @click="handleRegenerateAction"
+              title="重新生成回复"
+              :loading="isRegenerating"
+            >
+              <template #icon>
+                <n-icon><RefreshOutline /></n-icon>
+              </template>
+            </n-button>
+            
+            <!-- 测试按钮 -->
+            <n-button
+              quaternary
+              size="tiny"
+              circle
+              @click="handleTestAction"
+              title="在自由聊天中测试此提示词"
+            >
+              <template #icon>
+                <n-icon><FlaskOutline /></n-icon>
+              </template>
+            </n-button>
+          </template>
+          
+          <!-- 复制按钮 -->
           <n-dropdown
             :options="copyOptions"
             placement="bottom-end"
@@ -81,9 +127,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { ref, computed } from 'vue';
 import { NAvatar, NIcon, NSpin, NAlert, NTag, NButton, NDropdown } from 'naive-ui';
-import { PersonOutline, CopyOutline, FlaskOutline } from '@vicons/ionicons5';
+import { PersonOutline, CopyOutline, FlaskOutline, RefreshOutline, ChevronBackOutline, ChevronForwardOutline } from '@vicons/ionicons5';
 import { marked } from 'marked';
 import AgentIndicator from './AgentIndicator.vue';
 import type { ChatMessage } from '../types';
@@ -96,10 +142,43 @@ interface Props {
 interface Emits {
   (e: 'copy', message: ChatMessage, option?: string): void;
   (e: 'test', message: ChatMessage): void;
+  (e: 'regenerate', message: ChatMessage): void;
 }
 
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
+
+// 历史回复相关状态
+const currentAlternativeIndex = ref(0);
+const isRegenerating = ref(false);
+
+// 当前显示的内容
+const currentContent = computed(() => {
+  if (currentAlternativeIndex.value === 0) {
+    return props.message.content;
+  }
+  return props.message.alternatives?.[currentAlternativeIndex.value - 1]?.content || '';
+});
+
+// 处理上一个回复
+const handlePreviousAlternative = () => {
+  if (currentAlternativeIndex.value > 0) {
+    currentAlternativeIndex.value--;
+  }
+};
+
+// 处理下一个回复
+const handleNextAlternative = () => {
+  if (props.message.alternatives && currentAlternativeIndex.value < props.message.alternatives.length) {
+    currentAlternativeIndex.value++;
+  }
+};
+
+// 处理重新生成
+const handleRegenerateAction = () => {
+  isRegenerating.value = true;
+  emit('regenerate', props.message);
+};
 
 // Agent 映射
 const agentMap: Record<AgentType, { name: string; icon: string; color: string }> = {
@@ -340,15 +419,6 @@ const handleTestAction = () => {
   align-items: center;
 }
 
-.message-actions {
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.message-item:hover .message-actions {
-  opacity: 1;
-}
-
 .thinking {
   display: inline-flex;
   align-items: center;
@@ -372,6 +442,33 @@ const handleTestAction = () => {
   font-weight: 600;
   color: #4f46e5;
   margin-bottom: 6px;
+}
+
+.history-navigation {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 8px;
+}
+
+.alternative-counter {
+  font-size: 11px;
+  color: #667eea;
+  font-weight: 600;
+  padding: 0 4px;
+  user-select: none;
+}
+
+.message-actions {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.message-item:hover .message-actions {
+  opacity: 1;
 }
 
 @keyframes fadeIn {

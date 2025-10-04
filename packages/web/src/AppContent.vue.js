@@ -1,7 +1,7 @@
 /// <reference types="../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import { ref, onMounted } from 'vue';
 import { NModal, NSpace, NText, NAlert, useMessage, useDialog, } from 'naive-ui';
-import { ChatWindow, ConfigPanel, useChatStore, useConfigStore } from '@prompt-matrix/ui';
+import { ChatWindow, ConfigPanel, useChatStore, useConfigStore, useChatHistory } from '@prompt-matrix/ui';
 import { LLMService, RouterService } from '@prompt-matrix/core';
 // 导出/复制：取最后一条 AI 消息
 const exportMarkdown = () => {
@@ -28,6 +28,7 @@ const copyMarkdown = async () => {
 // 状态管理
 const chatStore = useChatStore();
 const configStore = useConfigStore();
+const { currentSession, clearAllSessions } = useChatHistory();
 const message = useMessage();
 const dialog = useDialog();
 // UI 状态
@@ -72,6 +73,20 @@ const initializeServices = () => {
         llmService.initialize(coreConfig);
         // 创建路由服务
         routerService = new RouterService(llmService);
+        // 注册已保存的自定义Agent
+        const savedAgents = localStorage.getItem('custom-engineers');
+        if (savedAgents) {
+            try {
+                const agents = JSON.parse(savedAgents);
+                if (agents.length > 0) {
+                    console.log('🔧 注册已保存的自定义Agent:', agents.length, '个');
+                    registerCustomAgents(agents);
+                }
+            }
+            catch (error) {
+                console.error('❌ 加载自定义Agent失败:', error);
+            }
+        }
         console.log('✅ Services initialized successfully');
         return true;
     }
@@ -189,10 +204,14 @@ const handleClearHistory = () => {
         positiveText: '确定',
         negativeText: '取消',
         onPositiveClick: () => {
+            // 清空聊天存储
             chatStore.clearMessages();
+            // 清空路由服务历史
             if (routerService) {
                 routerService.clearHistory();
             }
+            // 清空会话历史（关键修复）
+            clearAllSessions();
             message.success('历史已清空');
         },
     });
@@ -247,6 +266,182 @@ ${message.content}`;
     }
 };
 /**
+ * 处理自由聊天
+ */
+const handleFreeChat = async (prompt) => {
+    // 确保服务已初始化
+    if (!llmService) {
+        const success = initializeServices();
+        if (!success) {
+            message.error('服务初始化失败，请检查配置');
+            return;
+        }
+    }
+    if (!llmService.isInitialized()) {
+        message.error('请先配置API密钥');
+        return;
+    }
+    try {
+        chatStore.addLoadingMessage();
+        chatStore.loading.value = true;
+        // 添加用户消息
+        chatStore.addUserMessage(prompt);
+        chatStore.removeLoadingMessage();
+        // 创建流式响应消息
+        const streamingMsg = chatStore.addAssistantMessage('', {
+            agentType: 'CONDUCTOR',
+            intent: 'CHAT',
+            streaming: true,
+        });
+        // 直接调用LLM服务
+        let accumulatedContent = '';
+        await llmService.chatStream([{ role: 'user', content: prompt }], (chunk) => {
+            accumulatedContent += chunk;
+            streamingMsg.content = accumulatedContent;
+            // 强制触发响应式更新
+            const messageIndex = chatStore.messages.value.findIndex(m => m.id === streamingMsg.id);
+            if (messageIndex !== -1) {
+                chatStore.messages.value = [...chatStore.messages.value];
+            }
+        }, {
+            // 传递 reasoning tokens 配置
+            reasoningTokens: configStore.config.value.reasoningTokens,
+        });
+        // 完成
+        streamingMsg.streaming = false;
+        streamingMsg.content = accumulatedContent;
+        console.log('✅ 自由聊天完成');
+    }
+    catch (error) {
+        console.error('❌ 自由聊天失败:', error);
+        chatStore.removeLoadingMessage();
+        chatStore.addErrorMessage('请求失败: ' + error.message);
+    }
+    finally {
+        chatStore.loading.value = false;
+    }
+};
+/**
+ * 处理测试提示词
+ */
+const handleTestPrompt = (prompt) => {
+    // 显示提示信息
+    message.info(`🧪 已切换到自由聊天模式，正在测试提示词...`);
+    // 直接调用自由聊天处理
+    handleFreeChat(prompt);
+};
+/**
+ * 处理自定义Agent更新
+ */
+const handleCustomAgentsUpdate = (agents) => {
+    console.log('🔧 收到自定义Agent更新:', agents);
+    registerCustomAgents(agents);
+};
+/**
+ * 注册自定义Agent到RouterService
+ */
+const registerCustomAgents = (agents) => {
+    if (!routerService || !llmService) {
+        console.warn('⚠️ 服务未初始化，无法注册自定义Agent');
+        return;
+    }
+    try {
+        // 注册新的自定义Agent
+        agents.forEach(agent => {
+            const agentConfig = {
+                id: agent.id.startsWith('CUSTOM_') ? agent.id.replace('CUSTOM_', '') : agent.id, // 只移除一次前缀
+                name: agent.name,
+                prompt: agent.prompt,
+                expertise: agent.expertise,
+            };
+            console.log('🔧 注册自定义Agent:', agentConfig.name);
+            routerService.registerCustomAgent(agentConfig);
+        });
+        console.log('✅ 自定义Agent注册完成');
+    }
+    catch (error) {
+        console.error('❌ 自定义Agent注册失败:', error);
+    }
+};
+/**
+ * 处理重新生成
+ */
+const handleRegenerate = async (userMessage, originalAssistantMessage) => {
+    if (!routerService) {
+        const success = initializeServices();
+        if (!success)
+            return;
+    }
+    try {
+        // 保存原始回复到历史记录
+        if (!originalAssistantMessage.alternatives) {
+            originalAssistantMessage.alternatives = [];
+        }
+        // 创建新的回复对象（保存原始内容）
+        const originalCopy = { ...originalAssistantMessage };
+        delete originalCopy.alternatives; // 避免循环引用
+        // 如果当前回复不在历史记录中，添加进去
+        const existsInHistory = originalAssistantMessage.alternatives.some((alt) => alt.content === originalAssistantMessage.content);
+        if (!existsInHistory) {
+            originalAssistantMessage.alternatives.unshift(originalCopy);
+        }
+        // 移除加载中消息
+        chatStore.removeLoadingMessage();
+        // 创建新的流式响应消息
+        const streamingMsg = chatStore.addAssistantMessage('', {
+            agentType: originalAssistantMessage.agentType,
+            intent: originalAssistantMessage.intent,
+            streaming: true,
+            thinkingProcess: '正在重新生成回复...',
+        });
+        // 更新原始消息的内容为流式消息
+        originalAssistantMessage.content = '';
+        originalAssistantMessage.streaming = true;
+        // 重新调用路由服务
+        let accumulatedContent = '';
+        let currentThinkingProcess = '正在重新生成回复...';
+        const meta = await routerService.handleRequestStream(userMessage, (chunk) => {
+            accumulatedContent += chunk;
+            originalAssistantMessage.content = accumulatedContent;
+            // 强制触发响应式更新
+            const messageIndex = chatStore.messages.value.findIndex(m => m.id === originalAssistantMessage.id);
+            if (messageIndex !== -1) {
+                chatStore.messages.value = [...chatStore.messages.value];
+            }
+        }, (thinkingChunk) => {
+            if (thinkingChunk) {
+                currentThinkingProcess = thinkingChunk;
+                originalAssistantMessage.thinkingProcess = currentThinkingProcess;
+                // 强制触发响应式更新
+                const messageIndex = chatStore.messages.value.findIndex(m => m.id === originalAssistantMessage.id);
+                if (messageIndex !== -1) {
+                    chatStore.messages.value = [...chatStore.messages.value];
+                }
+            }
+        }, {
+            metadata: {
+                forcedAgent: 'CONDUCTOR', // 重新生成时使用自动路由
+            },
+        });
+        // 完成重新生成
+        originalAssistantMessage.streaming = false;
+        originalAssistantMessage.agentType = meta.agentType;
+        originalAssistantMessage.intent = meta.intent;
+        originalAssistantMessage.content = accumulatedContent;
+        originalAssistantMessage.thinkingProcess = undefined;
+        originalAssistantMessage.regenerationCount = (originalAssistantMessage.regenerationCount || 0) + 1;
+        message.success('回复已重新生成');
+    }
+    catch (error) {
+        console.error('❌ 重新生成失败:', error);
+        // 移除加载中消息
+        chatStore.removeLoadingMessage();
+        // 添加错误消息
+        chatStore.addErrorMessage(`重新生成失败: ${error.message}`);
+        message.error('重新生成失败，请查看错误详情');
+    }
+};
+/**
  * 组件挂载
  */
 onMounted(() => {
@@ -287,6 +482,11 @@ const __VLS_1 = __VLS_asFunctionalComponent(__VLS_0, new __VLS_0({
     ...{ 'onCopyMd': {} },
     ...{ 'onLoadSession': {} },
     ...{ 'onCopyMessage': {} },
+    ...{ 'onFreeChat': {} },
+    ...{ 'onTestPrompt': {} },
+    ...{ 'onUpdateLoading': {} },
+    ...{ 'onRegenerate': {} },
+    ...{ 'onCustomAgentsUpdate': {} },
     messages: (__VLS_ctx.chatStore.messages.value),
     loading: (__VLS_ctx.chatStore.loading.value),
     isConfigured: (__VLS_ctx.configStore.isConfigured.value),
@@ -300,6 +500,11 @@ const __VLS_2 = __VLS_1({
     ...{ 'onCopyMd': {} },
     ...{ 'onLoadSession': {} },
     ...{ 'onCopyMessage': {} },
+    ...{ 'onFreeChat': {} },
+    ...{ 'onTestPrompt': {} },
+    ...{ 'onUpdateLoading': {} },
+    ...{ 'onRegenerate': {} },
+    ...{ 'onCustomAgentsUpdate': {} },
     messages: (__VLS_ctx.chatStore.messages.value),
     loading: (__VLS_ctx.chatStore.loading.value),
     isConfigured: (__VLS_ctx.configStore.isConfigured.value),
@@ -337,81 +542,98 @@ const __VLS_13 = {
 const __VLS_14 = {
     onCopyMessage: (__VLS_ctx.handleCopyMessage)
 };
+const __VLS_15 = {
+    onFreeChat: (__VLS_ctx.handleFreeChat)
+};
+const __VLS_16 = {
+    onTestPrompt: (__VLS_ctx.handleTestPrompt)
+};
+const __VLS_17 = {
+    onUpdateLoading: (...[$event]) => {
+        __VLS_ctx.chatStore.loading.value = $event;
+    }
+};
+const __VLS_18 = {
+    onRegenerate: (__VLS_ctx.handleRegenerate)
+};
+const __VLS_19 = {
+    onCustomAgentsUpdate: (__VLS_ctx.handleCustomAgentsUpdate)
+};
 var __VLS_3;
-const __VLS_15 = {}.ConfigPanel;
+const __VLS_20 = {}.ConfigPanel;
 /** @type {[typeof __VLS_components.ConfigPanel, ]} */ ;
 // @ts-ignore
-const __VLS_16 = __VLS_asFunctionalComponent(__VLS_15, new __VLS_15({
+const __VLS_21 = __VLS_asFunctionalComponent(__VLS_20, new __VLS_20({
     ...{ 'onSave': {} },
     show: (__VLS_ctx.showConfig),
     config: (__VLS_ctx.configStore.config.value),
 }));
-const __VLS_17 = __VLS_16({
+const __VLS_22 = __VLS_21({
     ...{ 'onSave': {} },
     show: (__VLS_ctx.showConfig),
     config: (__VLS_ctx.configStore.config.value),
-}, ...__VLS_functionalComponentArgsRest(__VLS_16));
-let __VLS_19;
-let __VLS_20;
-let __VLS_21;
-const __VLS_22 = {
+}, ...__VLS_functionalComponentArgsRest(__VLS_21));
+let __VLS_24;
+let __VLS_25;
+let __VLS_26;
+const __VLS_27 = {
     onSave: (__VLS_ctx.handleSaveConfig)
 };
-var __VLS_18;
-const __VLS_23 = {}.NModal;
+var __VLS_23;
+const __VLS_28 = {}.NModal;
 /** @type {[typeof __VLS_components.NModal, typeof __VLS_components.nModal, typeof __VLS_components.NModal, typeof __VLS_components.nModal, ]} */ ;
 // @ts-ignore
-const __VLS_24 = __VLS_asFunctionalComponent(__VLS_23, new __VLS_23({
+const __VLS_29 = __VLS_asFunctionalComponent(__VLS_28, new __VLS_28({
     ...{ 'onPositiveClick': {} },
     show: (__VLS_ctx.showWelcome),
     preset: "dialog",
     title: "👋 欢迎使用智能提示词工程师系统",
     positiveText: "开始使用",
 }));
-const __VLS_25 = __VLS_24({
+const __VLS_30 = __VLS_29({
     ...{ 'onPositiveClick': {} },
     show: (__VLS_ctx.showWelcome),
     preset: "dialog",
     title: "👋 欢迎使用智能提示词工程师系统",
     positiveText: "开始使用",
-}, ...__VLS_functionalComponentArgsRest(__VLS_24));
-let __VLS_27;
-let __VLS_28;
-let __VLS_29;
-const __VLS_30 = {
+}, ...__VLS_functionalComponentArgsRest(__VLS_29));
+let __VLS_32;
+let __VLS_33;
+let __VLS_34;
+const __VLS_35 = {
     onPositiveClick: (...[$event]) => {
         __VLS_ctx.showWelcome = false;
     }
 };
-__VLS_26.slots.default;
-const __VLS_31 = {}.NSpace;
+__VLS_31.slots.default;
+const __VLS_36 = {}.NSpace;
 /** @type {[typeof __VLS_components.NSpace, typeof __VLS_components.nSpace, typeof __VLS_components.NSpace, typeof __VLS_components.nSpace, ]} */ ;
 // @ts-ignore
-const __VLS_32 = __VLS_asFunctionalComponent(__VLS_31, new __VLS_31({
+const __VLS_37 = __VLS_asFunctionalComponent(__VLS_36, new __VLS_36({
     vertical: true,
 }));
-const __VLS_33 = __VLS_32({
+const __VLS_38 = __VLS_37({
     vertical: true,
-}, ...__VLS_functionalComponentArgsRest(__VLS_32));
-__VLS_34.slots.default;
-const __VLS_35 = {}.NText;
+}, ...__VLS_functionalComponentArgsRest(__VLS_37));
+__VLS_39.slots.default;
+const __VLS_40 = {}.NText;
 /** @type {[typeof __VLS_components.NText, typeof __VLS_components.nText, typeof __VLS_components.NText, typeof __VLS_components.nText, ]} */ ;
 // @ts-ignore
-const __VLS_36 = __VLS_asFunctionalComponent(__VLS_35, new __VLS_35({}));
-const __VLS_37 = __VLS_36({}, ...__VLS_functionalComponentArgsRest(__VLS_36));
-__VLS_38.slots.default;
-var __VLS_38;
-const __VLS_39 = {}.NText;
+const __VLS_41 = __VLS_asFunctionalComponent(__VLS_40, new __VLS_40({}));
+const __VLS_42 = __VLS_41({}, ...__VLS_functionalComponentArgsRest(__VLS_41));
+__VLS_43.slots.default;
+var __VLS_43;
+const __VLS_44 = {}.NText;
 /** @type {[typeof __VLS_components.NText, typeof __VLS_components.nText, typeof __VLS_components.NText, typeof __VLS_components.nText, ]} */ ;
 // @ts-ignore
-const __VLS_40 = __VLS_asFunctionalComponent(__VLS_39, new __VLS_39({
+const __VLS_45 = __VLS_asFunctionalComponent(__VLS_44, new __VLS_44({
     depth: "3",
 }));
-const __VLS_41 = __VLS_40({
+const __VLS_46 = __VLS_45({
     depth: "3",
-}, ...__VLS_functionalComponentArgsRest(__VLS_40));
-__VLS_42.slots.default;
-var __VLS_42;
+}, ...__VLS_functionalComponentArgsRest(__VLS_45));
+__VLS_47.slots.default;
+var __VLS_47;
 __VLS_asFunctionalElement(__VLS_intrinsicElements.ul, __VLS_intrinsicElements.ul)({
     ...{ style: {} },
 });
@@ -421,22 +643,22 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.li, __VLS_intrinsicElements.li
 __VLS_asFunctionalElement(__VLS_intrinsicElements.li, __VLS_intrinsicElements.li)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.li, __VLS_intrinsicElements.li)({});
 if (!__VLS_ctx.configStore.isConfigured.value) {
-    const __VLS_43 = {}.NAlert;
+    const __VLS_48 = {}.NAlert;
     /** @type {[typeof __VLS_components.NAlert, typeof __VLS_components.nAlert, typeof __VLS_components.NAlert, typeof __VLS_components.nAlert, ]} */ ;
     // @ts-ignore
-    const __VLS_44 = __VLS_asFunctionalComponent(__VLS_43, new __VLS_43({
+    const __VLS_49 = __VLS_asFunctionalComponent(__VLS_48, new __VLS_48({
         type: "warning",
         title: "温馨提示",
     }));
-    const __VLS_45 = __VLS_44({
+    const __VLS_50 = __VLS_49({
         type: "warning",
         title: "温馨提示",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_44));
-    __VLS_46.slots.default;
-    var __VLS_46;
+    }, ...__VLS_functionalComponentArgsRest(__VLS_49));
+    __VLS_51.slots.default;
+    var __VLS_51;
 }
-var __VLS_34;
-var __VLS_26;
+var __VLS_39;
+var __VLS_31;
 /** @type {__VLS_StyleScopedClasses['app-content']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
@@ -460,6 +682,10 @@ const __VLS_self = (await import('vue')).defineComponent({
             handleClearHistory: handleClearHistory,
             handleLoadSession: handleLoadSession,
             handleCopyMessage: handleCopyMessage,
+            handleFreeChat: handleFreeChat,
+            handleTestPrompt: handleTestPrompt,
+            handleCustomAgentsUpdate: handleCustomAgentsUpdate,
+            handleRegenerate: handleRegenerate,
         };
     },
 });
