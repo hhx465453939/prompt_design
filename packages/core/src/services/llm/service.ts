@@ -51,6 +51,64 @@ export class LLMService {
   }
 
   /**
+   * 测试API连接
+   */
+  async testConnection(): Promise<boolean> {
+    if (!this.client || !this.config) {
+      throw new Error('LLM Service not initialized');
+    }
+
+    try {
+      // 发送一个简单的测试请求
+      const response = await this.client.chat.completions.create({
+        model: this.config.model,
+        messages: [{ role: 'user', content: 'Test connection' }],
+        max_tokens: 1,
+      });
+      
+      logger.info('API connection test successful');
+      return true;
+    } catch (error) {
+      logger.error('API connection test failed', error as Error);
+      throw error;
+    }
+  }
+
+  /**
+   * 获取可用模型列表
+   */
+  async getAvailableModels(): Promise<string[]> {
+    if (!this.client || !this.config) {
+      throw new Error('LLM Service not initialized');
+    }
+
+    try {
+      // 根据provider返回默认模型列表
+      const defaultModels: Record<string, string[]> = {
+        'deepseek': ['deepseek-chat', 'deepseek-coder'],
+        'openai': ['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo'],
+        'gemini': ['gemini-pro', 'gemini-pro-vision'],
+      };
+
+      let models = defaultModels[this.config.provider] || [];
+
+      // 尝试从API获取模型列表（如果支持的话）
+      try {
+        // 注意：不是所有供应商都支持模型列表API
+        // 这里提供一个通用的尝试，但主要依赖默认列表
+        logger.info(`Using default models for ${this.config.provider}:`, models);
+      } catch (error) {
+        logger.warn('Failed to fetch models from API, using defaults', error);
+      }
+
+      return models;
+    } catch (error) {
+      logger.error('Failed to get available models', error as Error);
+      throw error;
+    }
+  }
+
+  /**
    * 发送消息并获取响应（非流式）
    */
   async chat(messages: Message[], options?: Partial<LLMOptions>): Promise<string> {

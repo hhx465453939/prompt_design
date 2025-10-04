@@ -36,10 +36,40 @@
 
         <!-- 模型名称 -->
         <n-form-item label="模型名称" path="model">
-          <n-input
-            v-model:value="formData.model"
-            placeholder="例如: deepseek-chat"
-          />
+          <n-space vertical style="width: 100%;">
+            <n-input-group>
+              <n-select
+                v-model:value="formData.model"
+                :options="modelSelectOptions"
+                placeholder="选择或输入模型名称"
+                filterable
+                tag
+                :loading="loadingModels"
+                clearable
+              />
+              <n-button 
+                type="primary" 
+                ghost 
+                @click="testConnection"
+                :loading="testingConnection"
+                size="medium"
+              >
+                测试连接
+              </n-button>
+              <n-button 
+                type="info" 
+                ghost 
+                @click="loadModels"
+                :loading="loadingModels"
+                size="medium"
+              >
+                刷新模型
+              </n-button>
+            </n-input-group>
+            <n-text v-if="availableModels.length > 0" depth="3" style="font-size: 12px;">
+              已加载 {{ availableModels.length }} 个模型，点击"刷新模型"更新列表
+            </n-text>
+          </n-space>
         </n-form-item>
 
         <!-- 高级参数 -->
@@ -109,7 +139,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import {
   NDrawer,
   NDrawerContent,
@@ -117,6 +147,7 @@ import {
   NFormItem,
   NSelect,
   NInput,
+  NInputGroup,
   NInputNumber,
   NSlider,
   NButton,
@@ -124,9 +155,11 @@ import {
   NDivider,
   NCollapse,
   NCollapseItem,
+  NText,
   useMessage,
 } from 'naive-ui';
 import type { UserConfig } from '../types';
+import { LLMService } from '@prompt-matrix/core';
 
 interface Props {
   show: boolean;
@@ -157,6 +190,66 @@ const providerOptions = [
   { label: 'OpenAI', value: 'openai' },
   { label: 'Gemini', value: 'gemini' },
 ];
+
+// 测试连接和模型相关状态
+const testingConnection = ref(false);
+const loadingModels = ref(false);
+const availableModels = ref<string[]>([]);
+
+// 模型选择选项
+const modelSelectOptions = computed(() => {
+  return availableModels.value.map(model => ({
+    label: model,
+    value: model,
+  }));
+});
+
+// 测试连接
+const testConnection = async () => {
+  if (!formData.value.apiKey) {
+    message.warning('请先输入 API Key');
+    return;
+  }
+
+  testingConnection.value = true;
+  try {
+    const llmService = new LLMService();
+    llmService.initialize(formData.value);
+    
+    await llmService.testConnection();
+    message.success('连接测试成功！');
+  } catch (error) {
+    console.error('Connection test failed:', error);
+    message.error(`连接测试失败: ${(error as Error).message}`);
+  } finally {
+    testingConnection.value = false;
+  }
+};
+
+// 加载模型列表
+const loadModels = async () => {
+  if (!formData.value.apiKey) {
+    message.warning('请先输入 API Key');
+    return;
+  }
+
+  loadingModels.value = true;
+  try {
+    const llmService = new LLMService();
+    llmService.initialize(formData.value);
+    
+    const models = await llmService.getAvailableModels();
+    availableModels.value = models;
+    
+    message.success(`成功加载 ${models.length} 个模型`);
+  } catch (error) {
+    console.error('Failed to load models:', error);
+    message.error(`加载模型失败: ${(error as Error).message}`);
+    availableModels.value = [];
+  } finally {
+    loadingModels.value = false;
+  }
+};
 
 // 验证规则
 const rules = {
