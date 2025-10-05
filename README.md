@@ -248,6 +248,188 @@ console.log('Token使用量:', response.metadata.tokensUsed);
 - **模块化扩展**：可轻松添加新的工程师类型
 - **持续优化**：基于逆向分析的闭环改进机制
 
+## 🚀 生产环境部署
+
+### 构建生产版本
+
+```bash
+# 1. 构建所有包
+pnpm build
+
+# 构建输出目录
+packages/core/dist/     # 核心服务构建产物
+packages/ui/dist/       # UI组件构建产物  
+packages/web/dist/      # Web应用构建产物（主要部署目录）
+```
+
+### 部署方式
+
+#### 方式1：静态文件服务器（推荐）
+
+**使用 serve（简单快速）**
+```bash
+# 安装 serve
+npm install -g serve
+
+# 部署到 packages/web/dist 目录
+cd packages/web
+serve dist -p 3000
+
+# 访问 http://localhost:3000
+```
+
+**使用 nginx**
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+    root /path/to/packages/web/dist;
+    index index.html;
+    
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+```
+
+**使用 Apache**
+```apache
+<VirtualHost *:80>
+    ServerName your-domain.com
+    DocumentRoot /path/to/packages/web/dist
+    
+    <Directory /path/to/packages/web/dist>
+        AllowOverride All
+        Require all granted
+    </Directory>
+</VirtualHost>
+```
+
+#### 方式2：Node.js 服务器
+
+**使用 express**
+```bash
+# 安装依赖
+npm install express
+
+# 创建 server.js
+cat > server.js << 'EOF'
+const express = require('express');
+const path = require('path');
+const app = express();
+
+// 静态文件服务
+app.use(express.static(path.join(__dirname, 'packages/web/dist')));
+
+// SPA 路由支持
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'packages/web/dist/index.html'));
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
+EOF
+
+# 启动服务器
+node server.js
+```
+
+#### 方式3：云服务部署
+
+**Vercel 部署**
+```bash
+# 安装 Vercel CLI
+npm install -g vercel
+
+# 在项目根目录创建 vercel.json
+cat > vercel.json << 'EOF'
+{
+  "builds": [
+    {
+      "src": "packages/web/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "packages/web/dist"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "packages/web/dist/index.html"
+    }
+  ]
+}
+EOF
+
+# 部署
+vercel --prod
+```
+
+**Netlify 部署**
+```bash
+# 创建 netlify.toml
+cat > netlify.toml << 'EOF'
+[build]
+  publish = "packages/web/dist"
+  command = "pnpm build"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+EOF
+```
+
+### 环境配置
+
+**生产环境变量**
+```bash
+# 创建 .env.production
+cat > .env.production << 'EOF'
+VITE_DEEPSEEK_API_KEY=your-production-api-key
+VITE_DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEFAULT_CONDUCTOR_MODEL=deepseek-chat
+DEFAULT_EXPERT_MODEL=deepseek-chat
+EOF
+```
+
+**构建时注入环境变量**
+```bash
+# 构建时指定环境
+NODE_ENV=production pnpm build
+```
+
+### 性能优化
+
+**启用 Gzip 压缩**
+```nginx
+# nginx 配置
+gzip on;
+gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
+```
+
+**CDN 加速**
+- 将静态资源上传到 CDN
+- 配置缓存策略
+- 启用 HTTP/2
+
+### 监控与日志
+
+**基础监控**
+```bash
+# 使用 PM2 进程管理
+npm install -g pm2
+
+# 启动应用
+pm2 start server.js --name "prompt-matrix"
+
+# 监控
+pm2 monit
+```
+
 ## 📁 项目结构
 
 ```
