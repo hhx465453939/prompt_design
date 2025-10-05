@@ -92,29 +92,31 @@
 
 ## 📁 目录结构
 
-### 新架构目录
-- `agent_matrix/` - **Agent矩阵架构核心**（兼容接入生产工程师）
-  - `X1_basic/` - 基础提示词工程师（源：`agent_matrix/X1_basic/sources/`）
-  - `X2_domain/` - 领域特化工程师  
-  - `X3_model/` - 模型特化工程师
-  - `X4_scenario/` - 场景特化工程师（源：`agent_matrix/X4_scenario/sources/`）
-  - `X0_optimizer/` - 提示词优化师（源：`agent_matrix/X0_optimizer/sources/`）
-  - `X0_reverse/` - 逆向工程师
-  - `templates/` - 通用模板库
-  - `examples/` - 使用示例
-  - `docs/` - 架构文档
-  - `variants_catalog.md` - 变体目录（X0_a/X1_a等内涵与映射）
-
-#### 生产工程师复用映射（最新路径）
-- X1_basic → `agent_matrix/X1_basic/sources/agent专用提示词工程师.md`
-- X1_basic → `agent_matrix/X1_basic/sources/agent专用提示词工程师_性能强化250930.md`
-- X4_scenario → `agent_matrix/X4_scenario/sources/3.带建议优化角色_最优选_高智能模型.md`
-- X4_scenario → `agent_matrix/X4_scenario/sources/3.带建议优化角色_最优选_高智能模型_性能强化250930.md`
-- X0_optimizer → `agent_matrix/X0_optimizer/sources/提示词迭代优化工程师.md`
-
-### 兼容性说明
-- 历史目录已并入各X目录的 `sources/`。
-- 如有外部引用旧路径，请更新为上述“最新路径”。
+### 项目目录结构
+```
+prompt_design/
+├── packages/                    # 核心代码包
+│   ├── core/                   # 核心服务层
+│   │   ├── src/agents/         # Agent实现
+│   │   ├── src/services/       # 服务层
+│   │   └── dist/               # 构建输出
+│   ├── ui/                     # UI组件库
+│   │   ├── src/components/     # Vue组件
+│   │   ├── src/composables/    # 组合式函数
+│   │   └── dist/               # 构建输出
+│   └── web/                    # Web应用
+│       ├── src/                # 应用源码
+│       └── dist/               # 构建输出
+├── agent_matrix/               # Agent矩阵模板
+│   ├── X0_optimizer/           # X0优化师模板
+│   ├── X0_reverse/             # X0逆向工程师模板
+│   ├── X1_basic/               # X1基础工程师模板
+│   ├── X4_scenario/            # X4场景工程师模板
+│   └── docs/                   # 矩阵架构文档
+├── docs/                       # 项目文档
+├── logs/                       # 日志文件
+└── test/                       # 测试文件
+```
 
 ## 🚀 快速开始
 
@@ -434,43 +436,48 @@ pm2 monit
 
 ```
 prompt_design/
-├── packages/
-│   ├── core/                    # ✅ 核心服务层（已完成）
-│   │   ├── src/
-│   │   │   ├── agents/                # Agent实例
-│   │   │   │   ├── conductor.ts       # 前导Agent（指挥官）
-│   │   │   │   ├── x0-optimizer.ts    # X0优化师
-│   │   │   │   ├── x0-reverse.ts      # X0逆向工程师
-│   │   │   │   ├── x1-basic.ts        # X1基础工程师
-│   │   │   │   └── x4-scenario.ts     # X4场景工程师
-│   │   │   ├── services/              # 核心服务
-│   │   │   │   ├── llm/               # LLM调用（DeepSeek等）
-│   │   │   │   ├── router/            # 智能路由调度
-│   │   │   │   ├── agent/             # Agent管理
-│   │   │   │   ├── prompt/            # 提示词管理
-│   │   │   │   └── storage/           # 数据存储
-│   │   │   ├── types/                 # 类型定义
-│   │   │   └── utils/                 # 工具函数
-│   │   └── package.json
+├── packages/                    # 核心代码包
+│   ├── core/                   # ✅ 核心服务层（已完成）
+│   │   ├── src/agents/         # Agent实现
+│   │   │   ├── conductor.ts    # 前导Agent（指挥官）
+│   │   │   ├── x0-optimizer.ts # X0优化师
+│   │   │   ├── x0-reverse.ts   # X0逆向工程师
+│   │   │   ├── x1-basic.ts     # X1基础工程师
+│   │   │   ├── x4-scenario.ts  # X4场景工程师
+│   │   │   └── custom-agent.ts # 自定义Agent
+│   │   ├── src/services/       # 核心服务
+│   │   │   ├── llm/            # LLM调用服务
+│   │   │   ├── router/         # 智能路由调度
+│   │   │   ├── agent/          # Agent管理
+│   │   │   ├── prompt/         # 提示词管理
+│   │   │   └── storage/        # 数据存储
+│   │   └── dist/               # 构建输出
 │   │
-│   ├── ui/                      # ⏳ UI组件库（待开发）
-│   └── web/                     # ⏳ Web应用（待开发）
+│   ├── ui/                     # ✅ UI组件库（已完成）
+│   │   ├── src/components/     # Vue组件
+│   │   ├── src/composables/    # 组合式函数
+│   │   └── dist/               # 构建输出
+│   │
+│   └── web/                    # ✅ Web应用（已完成）
+│       ├── src/                # 应用源码
+│       └── dist/               # 构建输出
 │
-├── agent_matrix/                # Agent矩阵（现有）
-│   ├── X0_optimizer/            # X0优化师提示词模板
-│   ├── X0_reverse/              # X0逆向工程师模板
-│   ├── X1_basic/                # X1基础工程师模板
-│   ├── X4_scenario/             # X4场景工程师模板
-│   └── docs/                    # 矩阵架构文档
+├── agent_matrix/               # Agent矩阵模板
+│   ├── X0_optimizer/           # X0优化师提示词模板
+│   ├── X0_reverse/             # X0逆向工程师模板
+│   ├── X1_basic/               # X1基础工程师模板
+│   ├── X4_scenario/            # X4场景工程师模板
+│   └── docs/                   # 矩阵架构文档
 │
-├── docs/                        # ✅ 项目文档（已完成）
-│   ├── PRD.md                   # 产品需求文档
-│   ├── ARCHITECTURE.md          # 技术架构文档
-│   └── QUICK_START.md           # 快速开始指南
+├── docs/                       # ✅ 项目文档（已完成）
+│   ├── README.md               # 开发指南
+│   └── AUTO_MODE_PROPOSAL.md   # 自动模式技术方案
 │
-├── env.example                  # 环境变量模板
-├── package.json                 # 项目配置
-└── pnpm-workspace.yaml          # Monorepo配置
+├── logs/                       # 日志文件
+├── test/                       # 测试文件
+├── env.example                 # 环境变量模板
+├── package.json                # 项目配置
+└── pnpm-workspace.yaml         # Monorepo配置
 ```
 
 ---
@@ -505,11 +512,10 @@ prompt_design/
 
 ## 📚 文档索引
 
-- **[快速开始指南](docs/QUICK_START.md)**: 5分钟上手指南
-- **[产品需求文档（PRD）](docs/PRD.md)**: 完整的产品需求和功能规划
-- **[技术架构文档](docs/ARCHITECTURE.md)**: 深入的技术架构设计
-- **[开发指南](docs/DEVELOPMENT.md)**: 开发流程和代码规范
+- **[开发指南](docs/README.md)**: 详细的技术文档和开发指南
+- **[自动模式技术方案](docs/AUTO_MODE_PROPOSAL.md)**: 前导Agent自动模式技术方案
 - **[Agent矩阵文档](agent_matrix/docs/)**: Agent变体和架构设计
+- **[问题列表](ISSUES_20251005.md)**: 当前已知问题和修复计划
 
 ---
 
@@ -543,61 +549,63 @@ prompt_design/
 | ConfigPanel       | ✅   | 配置面板                          |
 | MessageItem       | ✅   | 消息显示组件                      |
 | ChatSidebar       | ✅   | 会话侧边栏                        |
+| CustomProviderManager | ✅ | 自定义提供商管理                |
 | Web应用           | ✅   | 完整Web应用集成                   |
 | 流式响应          | ✅   | 支持流式输出                      |
 | 多模型支持        | ✅   | 支持DeepSeek等主流模型            |
 | 消息重新生成      | ✅   | 支持重新生成回复                  |
 | Markdown导出      | ✅   | 支持导出和复制                    |
-| 代码清理          | ✅   | 清理53个调试语句，优化生产性能    |
+| 自定义Agent       | ✅   | 支持创建和管理自定义Agent         |
 
 ### 🆕 Phase 3: v0.1发布优化（已完成）
 
 | 功能模块          | 状态 | 说明                              |
 |-------------------|------|-----------------------------------|
-| 代码质量优化      | ✅   | 清理53个调试语句，生产就绪        |
-| 版本号统一        | ✅   | 所有包版本号统一为v0.1.0          |
+| 代码质量优化      | ✅   | 生产就绪，移除调试代码            |
+| 版本号统一        | ✅   | 所有包版本号统一为v0.1.0-20251005 |
 | README文档更新    | ✅   | 更新项目描述和发布说明            |
 | 赛博风格Logo      | ✅   | 新增矩阵风格ASCII Logo            |
-| 性能优化          | ✅   | 移除开发时调试代码，提升性能      |
+| 问题列表整理      | ✅   | 整理已知问题并制定修复计划        |
 
-### ⏳ Phase 4: 后续功能开发（v0.2+计划）
+### ⏳ Phase 4: 问题修复（v0.1.1计划）
+
+| 功能模块          | 状态 | 说明                              |
+|-------------------|------|-----------------------------------|
+| 流式输出停止按钮  | ⏳   | 添加流式输出终止功能              |
+| 测试模式修复      | ⏳   | 修复自由聊天模式功能              |
+| 聊天记录删除优化  | ⏳   | 完善单条删除和批量删除功能        |
+| 响应式更新优化    | ⏳   | 优化流式输出的响应式更新          |
+| 错误处理增强      | ⏳   | 完善错误提示和处理机制            |
+
+### ⏳ Phase 5: 功能增强（v0.2+计划）
 
 | 功能模块          | 状态 | 说明                              |
 |-------------------|------|-----------------------------------|
 | 自定义Agent增强   | ⏳   | 完善自定义Agent创建和管理         |
 | 聊天记录优化      | ⏳   | 改进会话管理和持久化              |
-| 单条消息删除      | ⏳   | 支持删除单条消息功能              |
 | Agent选择优化     | ⏳   | 提升智能路由准确率                |
-| 错误处理增强      | ⏳   | 完善错误提示和处理机制            |
+| 性能优化          | ⏳   | 虚拟滚动和性能提升                |
 
-### ⏳ Phase 5: 测试与优化（未来版本）
+### ⏳ Phase 6: 测试与部署（未来版本）
 
 | 功能模块          | 状态 | 说明                              |
 |-------------------|------|-----------------------------------|
 | 单元测试          | ⏳   | 核心服务测试覆盖                  |
 | 集成测试          | ⏳   | 端到端功能测试                    |
-| 性能基准测试      | ⏳   | 构建体积和运行性能基准            |
-| 代码质量保证      | ⏳   | 持续集成和代码审查                |
-
-### ⏳ Phase 6: 部署与交付（未来版本）
-
-| 功能模块          | 状态 | 说明                              |
-|-------------------|------|-----------------------------------|
 | 生产部署          | ⏳   | Docker容器化和生产部署            |
 | 监控与日志        | ⏳   | 系统监控和错误追踪                |
-| API文档           | ⏳   | 完整的API文档和示例               |
-| 用户指南          | ⏳   | 详细的使用教程和最佳实践          |
 
 ---
 
-## 🎉 v0.1.0 发布亮点
+## 🎉 v0.1.0-20251005 发布亮点
 
 ### ✨ 新特性
 - **智能Agent矩阵**：X0逆向、X0优化、X1基础、X4场景四大专业工程师
 - **智能路由系统**：自动识别用户意图，调度最合适的专家Agent
 - **流式响应**：实时的AI对话体验，支持长文本输出
 - **多模型支持**：兼容DeepSeek等主流大语言模型
-- **生产就绪**：代码经过全面清理和优化，移除53个调试语句
+- **自定义Agent**：支持用户创建和管理专用提示词工程师
+- **会话管理**：多会话支持、批量操作、消息管理
 
 ### 🎯 核心优势
 - **Token利用率提升15-20%**：通过智能优化算法提升效率
@@ -615,7 +623,13 @@ prompt_design/
 
 ## 📋 路线图
 
-### v0.2.0 (计划中)
+### v0.1.1 (问题修复)
+- 修复流式输出停止按钮问题
+- 修复测试模式功能失效
+- 完善聊天记录删除功能
+- 优化响应式更新性能
+
+### v0.2.0 (功能增强)
 - 增强自定义Agent管理功能
 - 优化会话管理和持久化
 - 提升Agent路由准确率
@@ -646,7 +660,7 @@ prompt_design/
 - 添加必要的注释和文档
 - 确保测试通过
 
-详见 **[开发指南](docs/DEVELOPMENT.md)**
+详见 **[开发指南](docs/README.md)**
 
 ---
 
@@ -691,6 +705,6 @@ pnpm dev
 ---
 
 **🤖 Made with ❤️ by the Prompt Engineering Matrix Team**
-**🎭 Cyberpunk AI Agent System v0.1.0**
+**🎭 Cyberpunk AI Agent System v0.1.0-20251005**
 
 </div>
