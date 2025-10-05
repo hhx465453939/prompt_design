@@ -37,6 +37,7 @@ const showWelcome = ref(false);
 // 服务实例
 let llmService = null;
 let routerService = null;
+let customAgentsRegistered = false; // 添加标记防止重复注册
 /**
  * 注册自定义Agent到RouterService
  */
@@ -54,10 +55,11 @@ const registerCustomAgents = (agents) => {
                 prompt: agent.prompt,
                 expertise: agent.expertise,
             };
-            console.log('🔧 注册自定义Agent:', agentConfig.name, 'ID:', agentConfig.id);
             routerService.registerCustomAgent(agentConfig);
+            console.log(`✅ 注册自定义Agent: ${agent.name} (CUSTOM_${agent.id})`);
         });
-        console.log('✅ 自定义Agent注册完成');
+        // 标记为已注册
+        customAgentsRegistered = true;
     }
     catch (error) {
         console.error('❌ 自定义Agent注册失败:', error);
@@ -97,23 +99,27 @@ const initializeServices = () => {
             configStore.saveConfig(updatedConfig);
         }
         llmService.initialize(coreConfig);
-        // 创建路由服务
-        routerService = new RouterService(llmService);
-        // 注册已保存的自定义Agent
-        const savedAgents = localStorage.getItem('custom-engineers');
-        if (savedAgents) {
-            try {
-                const agents = JSON.parse(savedAgents);
-                if (agents.length > 0) {
-                    console.log('🔧 注册已保存的自定义Agent:', agents.length, '个');
-                    registerCustomAgents(agents);
+        // 创建路由服务（只在第一次初始化时创建）
+        if (!routerService) {
+            routerService = new RouterService(llmService);
+        }
+        // 注册已保存的自定义Agent（只注册一次）
+        if (!customAgentsRegistered) {
+            const savedAgents = localStorage.getItem('custom-engineers');
+            if (savedAgents) {
+                try {
+                    const agents = JSON.parse(savedAgents);
+                    if (agents.length > 0) {
+                        registerCustomAgents(agents);
+                        customAgentsRegistered = true;
+                        console.log(`✅ 已注册 ${agents.length} 个自定义Agent`);
+                    }
+                }
+                catch (error) {
+                    console.error('❌ 加载自定义Agent失败:', error);
                 }
             }
-            catch (error) {
-                console.error('❌ 加载自定义Agent失败:', error);
-            }
         }
-        console.log('✅ Services initialized successfully');
         return true;
     }
     catch (error) {
@@ -187,11 +193,6 @@ const handleSend = async (text, selectedAgent) => {
         streamingMsg.content = accumulatedContent;
         // 清理思考过程显示
         streamingMsg.thinkingProcess = undefined;
-        console.log('✅ Response received:', {
-            agent: meta.agentType,
-            intent: meta.intent,
-            tokens: meta.metadata?.tokensUsed,
-        });
     }
     catch (error) {
         console.error('❌ Request failed:', error);
@@ -314,7 +315,6 @@ const handleFreeChat = async (prompt) => {
         // 完成
         streamingMsg.streaming = false;
         streamingMsg.content = accumulatedContent;
-        console.log('✅ 自由聊天完成');
     }
     catch (error) {
         console.error('❌ 自由聊天失败:', error);
@@ -338,14 +338,12 @@ const handleTestPrompt = (prompt) => {
  * 处理自定义Agent更新
  */
 const handleCustomAgentsUpdate = (agents) => {
-    console.log('🔧 收到自定义Agent更新:', agents);
     registerCustomAgents(agents);
 };
 /**
  * 处理删除消息
  */
 const handleDeleteMessage = (messageToDelete) => {
-    console.log('🗑️ AppContent 删除消息:', messageToDelete);
     // 找到消息在列表中的索引
     const messageIndex = chatStore.messages.value.findIndex(m => m.id === messageToDelete.id);
     if (messageIndex !== -1) {
@@ -357,11 +355,9 @@ const handleDeleteMessage = (messageToDelete) => {
             const nextMessage = chatStore.messages.value[messageIndex];
             if (nextMessage && nextMessage.role === 'assistant') {
                 chatStore.messages.value.splice(messageIndex, 1);
-                console.log('✅ 同时删除了助手回复');
             }
         }
         message.success('消息已删除');
-        console.log('✅ 消息删除完成，当前消息数:', chatStore.messages.value.length);
     }
     else {
         message.error('未找到要删除的消息');
@@ -455,11 +451,6 @@ watch(() => chatStore.messages.value, (messages) => {
     }
 }, { deep: true });
 onMounted(() => {
-    console.log('🚀 智能提示词工程师系统启动');
-    console.log('📊 配置状态:', {
-        isConfigured: configStore.isConfigured.value,
-        provider: configStore.config.value.provider,
-    });
     // 如果已配置，初始化服务
     if (configStore.isConfigured.value) {
         initializeServices();

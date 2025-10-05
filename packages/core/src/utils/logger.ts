@@ -144,9 +144,11 @@ export class UnifiedLogger {
       } else if (level === 'WARN') {
         console.warn(fullLogMessage);
       } else if (level === 'DEBUG') {
-        console.debug(fullLogMessage);
+        // DEBUG级别日志不输出到控制台（生产环境）
+        // console.debug(fullLogMessage);
       } else {
-        console.log(fullLogMessage);
+        // INFO级别日志在生产环境中不输出到控制台
+        // console.log(fullLogMessage);
       }
     }
     

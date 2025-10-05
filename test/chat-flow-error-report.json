@@ -1,7 +1,0 @@
-{
-  "timestamp": "2025-10-04T04:12:09.675Z",
-  "testType": "full-chat-flow-test",
-  "success": false,
-  "error": "Failed to read agent file: E:\\Development\\prompt_design/agent_matrix/X0_optimizer/sources/提示词迭代优化工程师.md",
-  "stack": "Error: Failed to read agent file: E:\\Development\\prompt_design/agent_matrix/X0_optimizer/sources/提示词迭代优化工程师.md\n    at AgentLoader.readAgentFile (file:///E:/Development/prompt_design/packages/core/dist/index.js:510:13)\n    at AgentLoader.loadX0Optimizer (file:///E:/Development/prompt_design/packages/core/dist/index.js:400:50)\n    at AgentLoader.loadAllAgents (file:///E:/Development/prompt_design/packages/core/dist/index.js:488:37)\n    at AgentManager.loadAllAgents (file:///E:/Development/prompt_design/packages/core/dist/index.js:1007:33)\n    at new AgentManager (file:///E:/Development/prompt_design/packages/core/dist/index.js:1000:10)\n    at file:///E:/Development/prompt_design/packages/core/dist/index.js:1062:20\n    at ModuleJob.run (node:internal/modules/esm/module_job:271:25)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:578:26)\n    at async testFullChatFlow (file:///E:/Development/prompt_design/test/test-full-chat-flow.mjs:57:43)"
-}

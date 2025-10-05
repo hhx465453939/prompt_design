@@ -23,7 +23,8 @@ export type AgentType =
   | 'X0_OPTIMIZER'   // X0优化师
   | 'X0_REVERSE'     // X0逆向工程师
   | 'X1_BASIC'       // X1基础工程师
-  | 'X4_SCENARIO';   // X4场景工程师
+  | 'X4_SCENARIO'    // X4场景工程师
+  | `CUSTOM_${string}`; // 自定义Agent
 
 // ===== 请求上下文 =====
 export interface RequestContext {

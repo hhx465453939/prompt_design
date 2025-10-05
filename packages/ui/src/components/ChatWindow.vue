@@ -252,7 +252,7 @@ const loadCustomAgents = () => {
     const saved = localStorage.getItem('custom-engineers');
     if (saved) {
       customAgents.value = JSON.parse(saved);
-      console.log('🔧 加载自定义工程师:', customAgents.value.length, '个');
+      // console.log('🔧 加载自定义工程师:', customAgents.value.length, '个');
       
       // 通知父组件更新自定义Agent
       if (customAgents.value.length > 0) {
@@ -268,7 +268,7 @@ const loadCustomAgents = () => {
 const saveCustomAgents = () => {
   try {
     localStorage.setItem('custom-engineers', JSON.stringify(customAgents.value));
-    console.log('🔧 保存自定义工程师:', customAgents.value.length, '个');
+    // console.log('🔧 保存自定义工程师:', customAgents.value.length, '个');
   } catch (error) {
     console.error('❌ 保存自定义工程师失败:', error);
   }
@@ -460,31 +460,31 @@ const handleTestMessage = (message: ChatMessage) => {
 
 // 处理重新生成
 const handleRegenerateMessage = (message: ChatMessage) => {
-  console.log('🔄 开始重新生成，目标消息:', message);
+  // console.log('🔄 开始重新生成，目标消息:', message);
   
   // 找到对应的用户消息
   const messageIndex = props.messages.findIndex(m => m.id === message.id);
-  console.log('🔄 消息索引:', messageIndex);
+  // console.log('🔄 消息索引:', messageIndex);
   
   if (messageIndex > 0) {
     const userMessage = props.messages[messageIndex - 1];
-    console.log('🔄 找到用户消息:', userMessage);
+    // console.log('🔄 找到用户消息:', userMessage);
     
     if (userMessage.role === 'user') {
       // 触发重新生成
-      console.log('🔄 触发重新生成事件');
+      // console.log('🔄 触发重新生成事件');
       emit('regenerate', userMessage.content, message);
     } else {
-      console.log('🔄 前一条消息不是用户消息:', userMessage.role);
+      // console.log('🔄 前一条消息不是用户消息:', userMessage.role);
     }
   } else {
-    console.log('🔄 没有找到对应的用户消息');
+    // console.log('🔄 没有找到对应的用户消息');
   }
 };
 
 // 处理删除消息
 const handleDeleteMessage = (message: ChatMessage) => {
-  console.log('🗑️ 删除消息:', message);
+  // console.log('🗑️ 删除消息:', message);
   
   // 显示确认对话框
   dialog.warning({
@@ -604,7 +604,7 @@ const handleEditCustomAgent = (agentId: string) => {
     return;
   }
 
-  console.log('🔧 编辑自定义Agent:', agent);
+  // console.log('🔧 编辑自定义Agent:', agent);
   
   // 设置表单数据
   customAgentForm.value = {
@@ -667,7 +667,7 @@ const handleDeleteCustomAgent = () => {
     return;
   }
 
-  console.log('🗑️ 删除自定义Agent:', agentToDelete.value);
+  // console.log('🗑️ 删除自定义Agent:', agentToDelete.value);
 
   // 从列表中移除
   const agentIndex = customAgents.value.findIndex(a => a.id === agentToDelete.value?.id);

@@ -12,5 +12,16 @@ export default defineConfig({
       '@': '/src',
     },
   },
+  build: {
+    target: 'esnext',
+    rollupOptions: {
+      output: {
+        manualChunks: undefined,
+      },
+    },
+  },
+  optimizeDeps: {
+    include: ['vue', 'naive-ui', '@prompt-matrix/core', '@prompt-matrix/ui'],
+  },
 });
 

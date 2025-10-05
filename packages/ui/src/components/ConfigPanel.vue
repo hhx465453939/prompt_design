@@ -355,7 +355,7 @@ const loadModels = async () => {
 
 // 处理供应商变更
 const handleProviderChange = (value: string) => {
-  console.log('🔧 切换供应商:', value);
+  // console.log('🔧 切换供应商:', value);
   
   if (value.startsWith('custom_')) {
     // 切换到自定义供应商
@@ -375,7 +375,7 @@ const handleProviderChange = (value: string) => {
     }
   } else {
     // 切换到预设供应商
-    console.log('🔧 切换到预设供应商:', value);
+    // console.log('🔧 切换到预设供应商:', value);
     
     // 获取默认的 baseURL
     const defaultBaseURLs: Record<string, string> = {
@@ -391,7 +391,7 @@ const handleProviderChange = (value: string) => {
     formData.value.baseURL = defaultBaseURLs[value] || '';
     availableModels.value = [];
     
-    console.log('🔧 设置新的 baseURL:', formData.value.baseURL);
+    // console.log('🔧 设置新的 baseURL:', formData.value.baseURL);
   }
 };
 

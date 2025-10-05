@@ -90,7 +90,7 @@ export function useChatHistory() {
   function updateSessionMessages(messages: ChatMessage[]) {
     // 如果没有当前会话，创建一个新会话
     if (!currentSessionId.value) {
-      console.log('📝 没有当前会话，自动创建新会话');
+      // console.log('📝 没有当前会话，自动创建新会话');
       createSession();
     }
 
@@ -109,7 +109,7 @@ export function useChatHistory() {
       }
       
       saveSessions();
-      console.log('✅ 会话消息已更新:', session.title);
+      // console.log('✅ 会话消息已更新:', session.title);
     }
   }
 

@@ -168,9 +168,9 @@ const selectedSessions = ref<string[]>([]);
 
 // 处理新建聊天
 const handleNewChat = () => {
-  console.log('🆕 创建新会话...');
+  // console.log('🆕 创建新会话...');
   const newSession = createSession();
-  console.log('✅ 新会话已创建:', newSession.id);
+  // console.log('✅ 新会话已创建:', newSession.id);
   emit('newChat');
 };
 
@@ -221,7 +221,7 @@ const handleDeleteSelected = () => {
   try {
     const deletedCount = selectedSessions.value.length;
     
-    console.log(`🗑️ 开始删除 ${deletedCount} 个会话...`);
+    // console.log(`🗑️ 开始删除 ${deletedCount} 个会话...`);
     
     // 逐个删除选中的会话
     selectedSessions.value.forEach(sessionId => {
@@ -234,7 +234,7 @@ const handleDeleteSelected = () => {
     message.success(`已删除 ${deletedCount} 个聊天记录`);
     showBatchActionsDialog.value = false;
     
-    console.log('✅ 批量删除完成，剩余会话数:', sessions.value.length);
+    // console.log('✅ 批量删除完成，剩余会话数:', sessions.value.length);
     // 注意：不自动创建新会话，让用户在需要时手动创建
     
   } catch (error) {
@@ -275,7 +275,7 @@ const getSessionMenuOptions = (sessionId: string) => {
 // 处理会话操作
 const handleSessionAction = (key: string) => {
   // 这个函数目前由菜单选项的onClick处理
-  console.log('Session action:', key);
+  // console.log('Session action:', key);
 };
 
 // 处理重命名会话

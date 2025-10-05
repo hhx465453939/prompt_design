@@ -28,6 +28,19 @@ const agentMap: Record<AgentType, { name: string; icon: string; tagType: any }> 
   X4_SCENARIO: { name: 'X4场景', icon: '🎨', tagType: 'error' },
 };
 
+// 处理自定义Agent
+const getCustomAgentInfo = (agentType: AgentType) => {
+  if (typeof agentType === 'string' && agentType.startsWith('CUSTOM_')) {
+    const id = agentType.replace('CUSTOM_', '');
+    return {
+      name: `自定义工程师 (${id})`,
+      icon: '🤖',
+      tagType: 'info',
+    };
+  }
+  return null;
+};
+
 // 意图名称映射
 const intentMap: Record<IntentType, string> = {
   REVERSE_ANALYSIS: '逆向分析',
@@ -37,10 +50,19 @@ const intentMap: Record<IntentType, string> = {
   CHAT: '对话',
 };
 
-const agentInfo = computed(() => agentMap[props.agentType] || {
-  name: 'Unknown',
-  icon: '🤖',
-  tagType: 'default',
+const agentInfo = computed(() => {
+  // 先检查是否是自定义Agent
+  const customInfo = getCustomAgentInfo(props.agentType);
+  if (customInfo) {
+    return customInfo;
+  }
+  
+  // 返回预定义Agent信息
+  return agentMap[props.agentType] || {
+    name: 'Unknown',
+    icon: '🤖',
+    tagType: 'default',
+  };
 });
 
 const intentName = computed(() => props.intent ? intentMap[props.intent] : '');

@@ -91,9 +91,11 @@ export class FrontendLogger {
       } else if (level === 'WARN') {
         console.warn(logMessage + formattedData);
       } else if (level === 'DEBUG') {
-        console.debug(logMessage + formattedData);
+        // DEBUG级别日志不输出到控制台（生产环境）
+        // console.debug(logMessage + formattedData);
       } else {
-        console.log(logMessage + formattedData);
+        // INFO级别日志在生产环境中不输出到控制台
+        // console.log(logMessage + formattedData);
       }
     }
   }

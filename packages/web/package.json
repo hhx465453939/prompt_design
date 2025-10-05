@@ -1,12 +1,14 @@
 {
   "name": "@prompt-matrix/web",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
+    "lint:fix": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore"
   },
   "dependencies": {
     "@prompt-matrix/core": "workspace:*",
@@ -17,6 +19,9 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.2.1",
+    "@vue/eslint-config-typescript": "^14.1.3",
+    "eslint": "^9.18.0",
+    "eslint-plugin-vue": "^9.32.0",
     "typescript": "^5.8.2",
     "vite": "^6.0.5",
     "vue-tsc": "^2.2.0"

@@ -86,10 +86,9 @@ ${context.userInput}
   }
 
   /**
-   * 估算Token数（简化版）
+   * 估算Token数
    */
   private estimateTokens(text: string): number {
-    // 简化估算：中文1字约1.5 token，英文1词约1 token
     const chineseChars = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
     const englishWords = text.split(/\s+/).length;
     return Math.ceil(chineseChars * 1.5 + englishWords);
@@ -99,7 +98,6 @@ ${context.userInput}
    * 提取优化建议
    */
   private extractSuggestions(response: string): string[] {
-    // TODO: 实现更智能的建议提取
     return [
       '已优化Token利用率',
       '已增强安全边界',

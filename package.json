@@ -1,6 +1,6 @@
 {
   "name": "prompt-engineer-matrix",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "智能提示词工程师代理系统 - Agent矩阵架构",
   "packageManager": "pnpm@10.6.1",
@@ -23,8 +23,8 @@
     "clean:vite": "rimraf \"packages/*/node_modules/.vite\"",
     "test": "pnpm -r test --run --passWithNoTests",
     "test:core": "node test-core.mjs",
-    "lint": "echo \"No linters configured yet\"",
-    "lint:fix": "echo \"No linters configured yet\""
+    "lint": "pnpm -F @prompt-matrix/ui lint && pnpm -F @prompt-matrix/web lint",
+    "lint:fix": "pnpm -F @prompt-matrix/ui lint:fix && pnpm -F @prompt-matrix/web lint:fix"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

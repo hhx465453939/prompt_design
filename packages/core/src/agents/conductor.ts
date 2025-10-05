@@ -18,9 +18,9 @@ export class ConductorAgent {
   async analyzeIntent(userInput: string, context?: RequestContext): Promise<IntentType> {
     logger.debug('Analyzing user intent', { input: userInput.substring(0, 100) });
 
-    console.log('🎯 ConductorAgent.analyzeIntent:');
-    console.log('  - 用户输入:', userInput);
-    console.log('  - 历史消息数量:', context?.history?.length || 0);
+    // console.log('🎯 ConductorAgent.analyzeIntent:');
+    // console.log('  - 用户输入:', userInput);
+    // console.log('  - 历史消息数量:', context?.history?.length || 0);
 
     // 计算各种意图的得分
     const scores: Record<IntentType, number> = {
@@ -31,7 +31,7 @@ export class ConductorAgent {
       CHAT: 0.1, // 聊天意图的基础分数
     };
 
-    console.log('  - 意图得分:', scores);
+    // console.log('  - 意图得分:', scores);
 
     // 找到得分最高的意图
     const maxIntent = Object.entries(scores).reduce((a, b) => 
@@ -39,16 +39,16 @@ export class ConductorAgent {
     )[0] as IntentType;
 
     const maxScore = scores[maxIntent];
-    console.log('  - 最高得分意图:', maxIntent, '得分:', maxScore);
+    // console.log('  - 最高得分意图:', maxIntent, '得分:', maxScore);
 
     // 如果最高得分太低，返回基础设计
     if (maxScore < 0.6) {
-      console.log('  - 得分过低，使用默认基础设计');
+      // console.log('  - 得分过低，使用默认基础设计');
       logger.info('Intent detected: BASIC_DESIGN (low confidence)');
       return 'BASIC_DESIGN';
     }
 
-    console.log('  - 最终意图:', maxIntent);
+    // console.log('  - 最终意图:', maxIntent);
     logger.info(`Intent detected: ${maxIntent} (score: ${maxScore.toFixed(2)})`);
     return maxIntent;
   }
@@ -114,7 +114,7 @@ export class ConductorAgent {
     if (input.length > 200) score += 0.2;
     if (input.length > 500) score += 0.1;
     
-    console.log('    - 提示词分析: 关键词', matchedKeywords.length, '结构', lineCount, '行, 长度', input.length);
+    // console.log('    - 提示词分析: 关键词', matchedKeywords.length, '结构', lineCount, '行, 长度', input.length);
     
     return Math.min(score, 1.0);
   }
@@ -152,7 +152,7 @@ export class ConductorAgent {
       score *= 0.5;
     }
     
-    console.log('    - 优化分析: 匹配词', matchedWords, '得分', score);
+    // console.log('    - 优化分析: 匹配词', matchedWords, '得分', score);
     
     return Math.min(score, 1.0);
   }
@@ -217,11 +217,11 @@ export class ConductorAgent {
       }
       
       if (categoryScore > 0) {
-        console.log(`    - ${category.name}分析: 匹配词`, matchedKeywords, '得分', categoryScore);
+        // console.log(`    - ${category.name}分析: 匹配词`, matchedKeywords, '得分', categoryScore);
       }
     }
     
-    console.log('    - 场景分析: 最佳类别', matchedCategory, '得分', maxScore);
+    // console.log('    - 场景分析: 最佳类别', matchedCategory, '得分', maxScore);
     
     return Math.min(maxScore, 1.0);
   }

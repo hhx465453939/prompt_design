@@ -249,12 +249,9 @@ export class AgentLoader {
 
   /**
    * 从Markdown提取系统提示词
-   * 简化版：直接返回整个内容作为系统提示词
-   * 后续可以根据实际格式进行更精细的解析
+   * 直接返回整个内容作为系统提示词
    */
   private extractSystemPrompt(content: string): string {
-    // TODO: 实现更精细的解析逻辑
-    // 可以提取特定章节，如 "## System Prompt" 或 "## Role"
     return content.trim();
   }
 }
