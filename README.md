@@ -39,6 +39,8 @@
 - **双轨配置**：支持.env文件和WebUI两种配置方式
 - **可扩展**：易于集成新的大模型和Agent类型
 
+<img width="1639" height="916" alt="image" src="https://github.com/user-attachments/assets/a652f7fa-de71-4626-9f54-9ded3a31380d" />
+
 ---
 
 ## 🏗️ Agent矩阵架构
