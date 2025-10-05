@@ -1,6 +1,6 @@
 {
   "name": "prompt-engineer-matrix",
-  "version": "0.1.0",
+  "version": "0.1.0-20241230",
   "private": true,
   "description": "智能提示词工程师代理系统 - Agent矩阵架构",
   "packageManager": "pnpm@10.6.1",
