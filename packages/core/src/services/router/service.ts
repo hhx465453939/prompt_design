@@ -51,6 +51,13 @@ export class RouterService {
     const agentType = `CUSTOM_${config.id}` as AgentType;
     const customAgent = new CustomAgent(config, this.llmService);
     this.agents.set(agentType, customAgent);
+    
+    console.log('🔧 RouterService.registerCustomAgent:');
+    console.log('  - 配置ID:', config.id);
+    console.log('  - 生成的AgentType:', agentType);
+    console.log('  - 当前所有Agent:', Array.from(this.agents.keys()));
+    console.log('  - 自定义Agent数量:', this.agents.size);
+    
     logger.info(`Custom agent registered: ${config.name} (${agentType})`);
   }
 
@@ -72,6 +79,12 @@ export class RouterService {
       // 步骤2: 意图分析（支持强制路由）
       logger.info('Step 1: Analyzing user intent...');
       const forcedAgent = (fullContext as any).metadata?.forcedAgent as AgentType | undefined;
+      
+      console.log('🎯 RouterService.handleRequest:');
+      console.log('  - 用户输入:', userInput);
+      console.log('  - 强制Agent:', forcedAgent);
+      console.log('  - 可用Agent列表:', Array.from(this.agents.keys()));
+      
       const intent = forcedAgent ? 'CHAT' : await this.conductor.analyzeIntent(userInput, fullContext);
 
       // 步骤3: 路由决策
@@ -80,11 +93,18 @@ export class RouterService {
         ? { targetAgent: forcedAgent, intent, reasoning: 'Forced by user selection' }
         : await this.conductor.makeRoutingDecision(intent, fullContext);
 
+      console.log('  - 路由决策:', decision);
+      console.log('  - 目标Agent:', decision.targetAgent);
+
       // 步骤4: 调用目标Agent
       logger.info(`Step 3: Routing to ${decision.targetAgent}...`);
       const targetAgent = this.agents.get(decision.targetAgent);
       
+      console.log('  - 找到目标Agent:', !!targetAgent);
+      
       if (!targetAgent) {
+        console.error('❌ Agent未找到:', decision.targetAgent);
+        console.error('❌ 可用Agent:', Array.from(this.agents.keys()));
         throw new Error(`Agent not found: ${decision.targetAgent}`);
       }
 
@@ -144,6 +164,12 @@ export class RouterService {
     // 意图与路由（支持强制路由）
     onThinking?.('🔍 **意图分析**\n正在解析您的需求...');
     const forcedAgent = (fullContext as any).metadata?.forcedAgent as AgentType | undefined;
+    
+    console.log('🎯 RouterService.handleRequestStream:');
+    console.log('  - 用户输入:', userInput);
+    console.log('  - 强制Agent:', forcedAgent);
+    console.log('  - 可用Agent列表:', Array.from(this.agents.keys()));
+    
     const intent = forcedAgent ? 'CHAT' : await this.conductor.analyzeIntent(userInput, fullContext);
     
     onThinking?.(`🎯 **意图识别**：${intent}\n\n🤔 **路由决策**\n正在选择最合适的专家Agent...`);
@@ -151,8 +177,15 @@ export class RouterService {
       ? { targetAgent: forcedAgent, intent, reasoning: 'Forced by user selection' }
       : await this.conductor.makeRoutingDecision(intent, fullContext);
 
+    console.log('  - 流式路由决策:', decision);
+    console.log('  - 目标Agent:', decision.targetAgent);
+
     const targetAgent = this.agents.get(decision.targetAgent);
+    console.log('  - 找到目标Agent:', !!targetAgent);
+    
     if (!targetAgent) {
+      console.error('❌ 流式Agent未找到:', decision.targetAgent);
+      console.error('❌ 可用Agent:', Array.from(this.agents.keys()));
       throw new Error(`Agent not found: ${decision.targetAgent}`);
     }
 
@@ -203,6 +236,16 @@ export class RouterService {
       X1_BASIC: 'X1基础工程师',
       X4_SCENARIO: 'X4场景工程师',
     };
+    
+    // 如果是自定义Agent，尝试从Agent实例中获取名称
+    if (agentType.startsWith('CUSTOM_')) {
+      const agent = this.agents.get(agentType);
+      if (agent && 'config' in agent && agent.config.name) {
+        return agent.config.name;
+      }
+      return `自定义工程师 ${agentType.replace('CUSTOM_', '')}`;
+    }
+    
     return agentNames[agentType] || agentType;
   }
 

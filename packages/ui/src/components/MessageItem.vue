@@ -120,6 +120,19 @@
               </template>
             </n-button>
           </n-dropdown>
+          
+          <!-- 删除按钮 -->
+          <n-button
+            quaternary
+            size="tiny"
+            circle
+            @click="handleDeleteAction"
+            title="删除此消息"
+          >
+            <template #icon>
+              <n-icon><TrashOutline /></n-icon>
+            </template>
+          </n-button>
         </div>
       </div>
     </div>
@@ -129,7 +142,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { NAvatar, NIcon, NSpin, NAlert, NTag, NButton, NDropdown } from 'naive-ui';
-import { PersonOutline, CopyOutline, FlaskOutline, RefreshOutline, ChevronBackOutline, ChevronForwardOutline } from '@vicons/ionicons5';
+import { PersonOutline, CopyOutline, FlaskOutline, RefreshOutline, ChevronBackOutline, ChevronForwardOutline, TrashOutline } from '@vicons/ionicons5';
 import { marked } from 'marked';
 import AgentIndicator from './AgentIndicator.vue';
 import type { ChatMessage } from '../types';
@@ -143,6 +156,7 @@ interface Emits {
   (e: 'copy', message: ChatMessage, option?: string): void;
   (e: 'test', message: ChatMessage): void;
   (e: 'regenerate', message: ChatMessage): void;
+  (e: 'delete', message: ChatMessage): void;
 }
 
 const props = defineProps<Props>();
@@ -260,6 +274,10 @@ const handleCopyAction = (key: string) => {
 // 处理测试操作
 const handleTestAction = () => {
   emit('test', props.message);
+};
+
+const handleDeleteAction = () => {
+  emit('delete', props.message);
 };
 </script>
 

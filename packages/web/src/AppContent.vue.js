@@ -1,5 +1,5 @@
 /// <reference types="../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { NModal, NSpace, NText, NAlert, useMessage, useDialog, } from 'naive-ui';
 import { ChatWindow, ConfigPanel, useChatStore, useConfigStore, useChatHistory } from '@prompt-matrix/ui';
 import { LLMService, RouterService } from '@prompt-matrix/core';
@@ -28,7 +28,7 @@ const copyMarkdown = async () => {
 // 状态管理
 const chatStore = useChatStore();
 const configStore = useConfigStore();
-const { currentSession, clearAllSessions } = useChatHistory();
+const { currentSession, updateSessionMessages } = useChatHistory();
 const message = useMessage();
 const dialog = useDialog();
 // UI 状态
@@ -195,28 +195,6 @@ const handleSaveConfig = (config) => {
     initializeServices();
 };
 /**
- * 清空历史
- */
-const handleClearHistory = () => {
-    dialog.warning({
-        title: '确认清空',
-        content: '确定要清空所有对话历史吗？',
-        positiveText: '确定',
-        negativeText: '取消',
-        onPositiveClick: () => {
-            // 清空聊天存储
-            chatStore.clearMessages();
-            // 清空路由服务历史
-            if (routerService) {
-                routerService.clearHistory();
-            }
-            // 清空会话历史（关键修复）
-            clearAllSessions();
-            message.success('历史已清空');
-        },
-    });
-};
-/**
  * 加载会话
  */
 const handleLoadSession = (messages) => {
@@ -338,6 +316,32 @@ const handleCustomAgentsUpdate = (agents) => {
     registerCustomAgents(agents);
 };
 /**
+ * 处理删除消息
+ */
+const handleDeleteMessage = (messageToDelete) => {
+    console.log('🗑️ AppContent 删除消息:', messageToDelete);
+    // 找到消息在列表中的索引
+    const messageIndex = chatStore.messages.value.findIndex(m => m.id === messageToDelete.id);
+    if (messageIndex !== -1) {
+        // 删除消息
+        chatStore.messages.value.splice(messageIndex, 1);
+        // 如果删除的是用户消息，同时删除后续的助手回复
+        if (messageToDelete.role === 'user') {
+            // 查找该用户消息后面的助手消息并删除
+            const nextMessage = chatStore.messages.value[messageIndex];
+            if (nextMessage && nextMessage.role === 'assistant') {
+                chatStore.messages.value.splice(messageIndex, 1);
+                console.log('✅ 同时删除了助手回复');
+            }
+        }
+        message.success('消息已删除');
+        console.log('✅ 消息删除完成，当前消息数:', chatStore.messages.value.length);
+    }
+    else {
+        message.error('未找到要删除的消息');
+    }
+};
+/**
  * 注册自定义Agent到RouterService
  */
 const registerCustomAgents = (agents) => {
@@ -349,12 +353,12 @@ const registerCustomAgents = (agents) => {
         // 注册新的自定义Agent
         agents.forEach(agent => {
             const agentConfig = {
-                id: agent.id.startsWith('CUSTOM_') ? agent.id.replace('CUSTOM_', '') : agent.id, // 只移除一次前缀
+                id: agent.id, // 直接使用原始ID，不做前缀处理
                 name: agent.name,
                 prompt: agent.prompt,
                 expertise: agent.expertise,
             };
-            console.log('🔧 注册自定义Agent:', agentConfig.name);
+            console.log('🔧 注册自定义Agent:', agentConfig.name, 'ID:', agentConfig.id);
             routerService.registerCustomAgent(agentConfig);
         });
         console.log('✅ 自定义Agent注册完成');
@@ -444,6 +448,12 @@ const handleRegenerate = async (userMessage, originalAssistantMessage) => {
 /**
  * 组件挂载
  */
+// 监听消息变化，更新会话历史
+watch(() => chatStore.messages.value, (messages) => {
+    if (messages.length > 0) {
+        updateSessionMessages(messages);
+    }
+}, { deep: true });
 onMounted(() => {
     console.log('🚀 智能提示词工程师系统启动');
     console.log('📊 配置状态:', {
@@ -477,7 +487,6 @@ const __VLS_1 = __VLS_asFunctionalComponent(__VLS_0, new __VLS_0({
     ...{ 'onSend': {} },
     ...{ 'onSendExample': {} },
     ...{ 'onOpenSettings': {} },
-    ...{ 'onClearHistory': {} },
     ...{ 'onExportMd': {} },
     ...{ 'onCopyMd': {} },
     ...{ 'onLoadSession': {} },
@@ -487,6 +496,7 @@ const __VLS_1 = __VLS_asFunctionalComponent(__VLS_0, new __VLS_0({
     ...{ 'onUpdateLoading': {} },
     ...{ 'onRegenerate': {} },
     ...{ 'onCustomAgentsUpdate': {} },
+    ...{ 'onDeleteMessage': {} },
     messages: (__VLS_ctx.chatStore.messages.value),
     loading: (__VLS_ctx.chatStore.loading.value),
     isConfigured: (__VLS_ctx.configStore.isConfigured.value),
@@ -495,7 +505,6 @@ const __VLS_2 = __VLS_1({
     ...{ 'onSend': {} },
     ...{ 'onSendExample': {} },
     ...{ 'onOpenSettings': {} },
-    ...{ 'onClearHistory': {} },
     ...{ 'onExportMd': {} },
     ...{ 'onCopyMd': {} },
     ...{ 'onLoadSession': {} },
@@ -505,6 +514,7 @@ const __VLS_2 = __VLS_1({
     ...{ 'onUpdateLoading': {} },
     ...{ 'onRegenerate': {} },
     ...{ 'onCustomAgentsUpdate': {} },
+    ...{ 'onDeleteMessage': {} },
     messages: (__VLS_ctx.chatStore.messages.value),
     loading: (__VLS_ctx.chatStore.loading.value),
     isConfigured: (__VLS_ctx.configStore.isConfigured.value),
@@ -524,40 +534,40 @@ const __VLS_9 = {
     }
 };
 const __VLS_10 = {
-    onClearHistory: (__VLS_ctx.handleClearHistory)
-};
-const __VLS_11 = {
     onExportMd: (...[$event]) => {
         __VLS_ctx.exportMarkdown();
     }
 };
-const __VLS_12 = {
+const __VLS_11 = {
     onCopyMd: (...[$event]) => {
         __VLS_ctx.copyMarkdown();
     }
 };
-const __VLS_13 = {
+const __VLS_12 = {
     onLoadSession: (__VLS_ctx.handleLoadSession)
 };
-const __VLS_14 = {
+const __VLS_13 = {
     onCopyMessage: (__VLS_ctx.handleCopyMessage)
 };
-const __VLS_15 = {
+const __VLS_14 = {
     onFreeChat: (__VLS_ctx.handleFreeChat)
 };
-const __VLS_16 = {
+const __VLS_15 = {
     onTestPrompt: (__VLS_ctx.handleTestPrompt)
 };
-const __VLS_17 = {
+const __VLS_16 = {
     onUpdateLoading: (...[$event]) => {
         __VLS_ctx.chatStore.loading.value = $event;
     }
 };
-const __VLS_18 = {
+const __VLS_17 = {
     onRegenerate: (__VLS_ctx.handleRegenerate)
 };
-const __VLS_19 = {
+const __VLS_18 = {
     onCustomAgentsUpdate: (__VLS_ctx.handleCustomAgentsUpdate)
+};
+const __VLS_19 = {
+    onDeleteMessage: (__VLS_ctx.handleDeleteMessage)
 };
 var __VLS_3;
 const __VLS_20 = {}.ConfigPanel;
@@ -679,12 +689,12 @@ const __VLS_self = (await import('vue')).defineComponent({
             handleSend: handleSend,
             handleSendExample: handleSendExample,
             handleSaveConfig: handleSaveConfig,
-            handleClearHistory: handleClearHistory,
             handleLoadSession: handleLoadSession,
             handleCopyMessage: handleCopyMessage,
             handleFreeChat: handleFreeChat,
             handleTestPrompt: handleTestPrompt,
             handleCustomAgentsUpdate: handleCustomAgentsUpdate,
+            handleDeleteMessage: handleDeleteMessage,
             handleRegenerate: handleRegenerate,
         };
     },

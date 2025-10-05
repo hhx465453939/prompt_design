@@ -8,8 +8,7 @@
       @send="handleSend"
       @send-example="handleSendExample"
       @open-settings="showConfig = true"
-      @clear-history="handleClearHistory"
-      @export-md="exportMarkdown()"
+        @export-md="exportMarkdown()"
       @copy-md="copyMarkdown()"
       @load-session="handleLoadSession"
       @copy-message="handleCopyMessage"
@@ -18,6 +17,7 @@
       @update-loading="chatStore.loading.value = $event"
       @regenerate="handleRegenerate"
       @custom-agents-update="handleCustomAgentsUpdate"
+      @delete-message="handleDeleteMessage"
     />
 
     <!-- 配置面板 -->
@@ -54,7 +54,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import {
   NModal,
   NSpace,
@@ -66,6 +66,7 @@ import {
 import { ChatWindow, ConfigPanel, useChatStore, useConfigStore, useChatHistory } from '@prompt-matrix/ui';
 import type { UserConfig as UIUserConfig } from '@prompt-matrix/ui';
 import { LLMService, RouterService } from '@prompt-matrix/core';
+import type { ChatMessage } from '@prompt-matrix/ui';
 // 导出/复制：取最后一条 AI 消息
 const exportMarkdown = () => {
   const ai = [...chatStore.messages.value].reverse().find(m => m.role === 'assistant' && !m.isLoading && !m.isError);
@@ -92,7 +93,7 @@ import type { UserConfig as CoreUserConfig } from '@prompt-matrix/core';
 // 状态管理
 const chatStore = useChatStore();
 const configStore = useConfigStore();
-const { currentSession, clearAllSessions } = useChatHistory();
+const { currentSession, updateSessionMessages } = useChatHistory();
 const message = useMessage();
 const dialog = useDialog();
 
@@ -286,31 +287,6 @@ const handleSaveConfig = (config: UIUserConfig) => {
   initializeServices();
 };
 
-/**
- * 清空历史
- */
-const handleClearHistory = () => {
-  dialog.warning({
-    title: '确认清空',
-    content: '确定要清空所有对话历史吗？',
-    positiveText: '确定',
-    negativeText: '取消',
-    onPositiveClick: () => {
-      // 清空聊天存储
-      chatStore.clearMessages();
-      
-      // 清空路由服务历史
-      if (routerService) {
-        routerService.clearHistory();
-      }
-      
-      // 清空会话历史（关键修复）
-      clearAllSessions();
-      
-      message.success('历史已清空');
-    },
-  });
-};
 
 /**
  * 加载会话
@@ -451,6 +427,36 @@ const handleCustomAgentsUpdate = (agents: Array<{ id: string; name: string; prom
 };
 
 /**
+ * 处理删除消息
+ */
+const handleDeleteMessage = (messageToDelete: ChatMessage) => {
+  console.log('🗑️ AppContent 删除消息:', messageToDelete);
+  
+  // 找到消息在列表中的索引
+  const messageIndex = chatStore.messages.value.findIndex(m => m.id === messageToDelete.id);
+  
+  if (messageIndex !== -1) {
+    // 删除消息
+    chatStore.messages.value.splice(messageIndex, 1);
+    
+    // 如果删除的是用户消息，同时删除后续的助手回复
+    if (messageToDelete.role === 'user') {
+      // 查找该用户消息后面的助手消息并删除
+      const nextMessage = chatStore.messages.value[messageIndex];
+      if (nextMessage && nextMessage.role === 'assistant') {
+        chatStore.messages.value.splice(messageIndex, 1);
+        console.log('✅ 同时删除了助手回复');
+      }
+    }
+    
+    message.success('消息已删除');
+    console.log('✅ 消息删除完成，当前消息数:', chatStore.messages.value.length);
+  } else {
+    message.error('未找到要删除的消息');
+  }
+};
+
+/**
  * 注册自定义Agent到RouterService
  */
 const registerCustomAgents = (agents: Array<{ id: string; name: string; prompt: string; expertise?: string; icon: string; color: string }>) => {
@@ -463,13 +469,13 @@ const registerCustomAgents = (agents: Array<{ id: string; name: string; prompt: 
     // 注册新的自定义Agent
     agents.forEach(agent => {
       const agentConfig = {
-        id: agent.id.startsWith('CUSTOM_') ? agent.id.replace('CUSTOM_', '') : agent.id, // 只移除一次前缀
+        id: agent.id, // 直接使用原始ID，不做前缀处理
         name: agent.name,
         prompt: agent.prompt,
         expertise: agent.expertise,
       };
       
-      console.log('🔧 注册自定义Agent:', agentConfig.name);
+      console.log('🔧 注册自定义Agent:', agentConfig.name, 'ID:', agentConfig.id);
       routerService!.registerCustomAgent(agentConfig);
     });
     
@@ -583,6 +589,17 @@ const handleRegenerate = async (userMessage: string, originalAssistantMessage: a
 /**
  * 组件挂载
  */
+// 监听消息变化，更新会话历史
+watch(
+  () => chatStore.messages.value,
+  (messages) => {
+    if (messages.length > 0) {
+      updateSessionMessages(messages);
+    }
+  },
+  { deep: true }
+);
+
 onMounted(() => {
   console.log('🚀 智能提示词工程师系统启动');
   console.log('📊 配置状态:', {

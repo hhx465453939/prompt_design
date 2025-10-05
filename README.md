@@ -2,7 +2,7 @@
 
 **Intelligent Prompt Engineering Matrix** - 基于Agent矩阵架构的智能提示词生成、优化和管理平台
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)](https://www.typescriptlang.org/)
 [![Vue 3](https://img.shields.io/badge/Vue-3.5-green)](https://vuejs.org/)
 
@@ -420,7 +420,7 @@ prompt_design/
 
 ## 📄 License
 
-本项目采用 [MIT](LICENSE) 协议开源。
+本项目采用 [Apache 2.0](LICENSE) 协议开源。
 
 ---
 

@@ -99,13 +99,7 @@
           导出所有聊天记录
         </n-button>
         
-        <n-button @click="handleClearAllSessions" type="warning" :disabled="sessions.length === 0">
-          <template #icon>
-            <n-icon><TrashOutline /></n-icon>
-          </template>
-          清空所有聊天记录
-        </n-button>
-      </n-space>
+              </n-space>
       
       <template #footer>
         <n-space justify="end">
@@ -159,7 +153,6 @@ const {
   switchSession,
   deleteSession,
   renameSession,
-  clearAllSessions,
 } = useChatHistory();
 
 // 对话框状态
@@ -175,7 +168,9 @@ const selectedSessions = ref<string[]>([]);
 
 // 处理新建聊天
 const handleNewChat = () => {
+  console.log('🆕 创建新会话...');
   const newSession = createSession();
+  console.log('✅ 新会话已创建:', newSession.id);
   emit('newChat');
 };
 
@@ -226,6 +221,8 @@ const handleDeleteSelected = () => {
   try {
     const deletedCount = selectedSessions.value.length;
     
+    console.log(`🗑️ 开始删除 ${deletedCount} 个会话...`);
+    
     // 逐个删除选中的会话
     selectedSessions.value.forEach(sessionId => {
       deleteSession(sessionId);
@@ -237,10 +234,9 @@ const handleDeleteSelected = () => {
     message.success(`已删除 ${deletedCount} 个聊天记录`);
     showBatchActionsDialog.value = false;
     
-    // 如果没有会话了，创建新会话
-    if (sessions.value.length === 0) {
-      handleNewChat();
-    }
+    console.log('✅ 批量删除完成，剩余会话数:', sessions.value.length);
+    // 注意：不自动创建新会话，让用户在需要时手动创建
+    
   } catch (error) {
     console.error('删除失败:', error);
     message.error('删除失败，请重试');
@@ -367,22 +363,6 @@ const handleExportAllSessions = () => {
   }
 };
 
-// 清空所有聊天记录
-const handleClearAllSessions = () => {
-  try {
-    // 使用 useChatHistory 的方法清空所有会话
-    clearAllSessions();
-    
-    message.success('已清空所有聊天记录');
-    showBatchActionsDialog.value = false;
-    
-    // 触发新建聊天
-    handleNewChat();
-  } catch (error) {
-    console.error('清空失败:', error);
-    message.error('清空失败，请重试');
-  }
-};
 </script>
 
 <style scoped>

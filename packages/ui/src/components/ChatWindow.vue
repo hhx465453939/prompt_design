@@ -20,12 +20,7 @@
               <n-icon><SettingsOutline /></n-icon>
             </template>
           </n-button>
-          <n-button quaternary circle @click="emit('clearHistory')">
-            <template #icon>
-              <n-icon><TrashOutline /></n-icon>
-            </template>
-          </n-button>
-        </div>
+          </div>
       </div>
 
       <!-- 消息列表区域 -->
@@ -64,6 +59,7 @@
             @copy="handleCopyMessage"
             @test="handleTestMessage"
             @regenerate="handleRegenerateMessage"
+            @delete="handleDeleteMessage"
           />
         </TransitionGroup>
       </div>
@@ -156,7 +152,7 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, watch, onMounted } from 'vue';
-import { NButton, NIcon, NEmpty, NSpace, NText, NSelect, NModal, NCard, NInput, NForm, NFormItem, useMessage } from 'naive-ui';
+import { NButton, NIcon, NEmpty, NSpace, NText, NSelect, NModal, NCard, NInput, NForm, NFormItem, useMessage, useDialog } from 'naive-ui';
 import {
   SettingsOutline,
   TrashOutline,
@@ -179,11 +175,11 @@ interface Emits {
   (e: 'send', message: string, forcedAgent?: string): void;
   (e: 'sendExample', example: string): void;
   (e: 'openSettings'): void;
-  (e: 'clearHistory'): void;
   (e: 'exportMd'): void;
   (e: 'copyMd'): void;
   (e: 'loadSession', messages: ChatMessage[]): void;
   (e: 'copyMessage', message: ChatMessage): void;
+  (e: 'deleteMessage', message: ChatMessage): void;
   (e: 'freeChat', message: string): void;
   (e: 'testPrompt', prompt: string): void;
   (e: 'updateLoading', loading: boolean): void;
@@ -198,6 +194,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<Emits>();
 const message = useMessage();
+const dialog = useDialog();
 
 // 聊天历史管理
 const {
@@ -331,6 +328,22 @@ const handleRegenerateMessage = (message: ChatMessage) => {
   }
 };
 
+// 处理删除消息
+const handleDeleteMessage = (message: ChatMessage) => {
+  console.log('🗑️ 删除消息:', message);
+  
+  // 显示确认对话框
+  dialog.warning({
+    title: '确认删除',
+    content: `确定要删除这条${message.role === 'user' ? '用户' : '助手'}消息吗？`,
+    positiveText: '删除',
+    negativeText: '取消',
+    onPositiveClick: () => {
+      emit('deleteMessage', message);
+    },
+  });
+};
+
 // 创建自定义工程师
 const handleCreateCustomAgent = () => {
   // 安全检查表单数据
@@ -340,7 +353,7 @@ const handleCreateCustomAgent = () => {
   }
 
   const newAgent = {
-    id: `CUSTOM_${Date.now()}`,
+    id: `${Date.now()}`,
     name: customAgentForm.value.name,
     prompt: customAgentForm.value.prompt,
     expertise: customAgentForm.value.expertise,
@@ -365,7 +378,7 @@ const handleCreateCustomAgent = () => {
   message.success(`自定义工程师 "${newAgent.name}" 创建成功！`);
   
   // 自动选择新创建的工程师
-  forcedAgent.value = newAgent.id.startsWith('CUSTOM_') ? newAgent.id : `CUSTOM_${newAgent.id}`;
+  forcedAgent.value = `CUSTOM_${newAgent.id}`;
   
   // 通知父组件更新自定义Agent
   emit('customAgentsUpdate', customAgents.value);
@@ -412,14 +425,11 @@ watch(() => props.messages, (newMessages) => {
 // 监听消息变化，自动滚动
 watch(() => props.messages.length, scrollToBottom);
 
-// 初始化时检查是否有当前会话，没有则创建新会话
+// 初始化时加载自定义工程师
 onMounted(() => {
   // 加载自定义工程师
   loadCustomAgents();
-  
-  if (!currentSession.value) {
-    createSession();
-  }
+  // 注意：不在这里自动创建会话，避免与清空历史功能冲突
 });
 </script>
 

@@ -88,7 +88,11 @@ export function useChatHistory() {
 
   // 更新会话消息
   function updateSessionMessages(messages: ChatMessage[]) {
-    if (!currentSessionId.value) return;
+    // 如果没有当前会话，创建一个新会话
+    if (!currentSessionId.value) {
+      console.log('📝 没有当前会话，自动创建新会话');
+      createSession();
+    }
 
     const session = sessions.value.find(s => s.id === currentSessionId.value);
     if (session) {
@@ -105,6 +109,7 @@ export function useChatHistory() {
       }
       
       saveSessions();
+      console.log('✅ 会话消息已更新:', session.title);
     }
   }
 
@@ -137,14 +142,7 @@ export function useChatHistory() {
     }
   }
 
-  // 清空所有会话
-  function clearAllSessions() {
-    sessions.value = [];
-    currentSessionId.value = null;
-    saveSessions();
-    saveCurrentSession();
-  }
-
+  
   return {
     sessions,
     currentSession,
@@ -154,6 +152,5 @@ export function useChatHistory() {
     updateSessionMessages,
     deleteSession,
     renameSession,
-    clearAllSessions,
   };
 }
