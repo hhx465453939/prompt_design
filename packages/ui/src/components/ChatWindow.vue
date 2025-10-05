@@ -79,8 +79,9 @@
             v-model:value="forcedAgent" 
             :options="agentOptions" 
             size="small" 
-            style="width: 200px"
+            style="width: 280px"
             placeholder="选择专家Agent"
+            :render-label="renderAgentSelectOption"
           />
           <n-button
             quaternary
@@ -114,50 +115,65 @@
     </div>
 
     <!-- 自定义工程师对话框 -->
-    <n-modal v-model:show="showCustomAgentDialog" preset="card" title="自定义提示词工程师" style="width: 500px;">
+    <n-modal v-model:show="showCustomAgentDialog" preset="card" :title="customAgentDialogTitle" style="width: 500px;">
       <n-form ref="customAgentFormRef" :model="customAgentForm" label-placement="top">
         <n-form-item label="工程师名称" required>
           <n-input 
             v-model:value="customAgentForm.name" 
             placeholder="给你的提示词工程师起个名字，如：Python专家、营销顾问等"
-          />
+                    />
         </n-form-item>
         <n-form-item label="系统提示词" required>
           <n-input 
             v-model:value="customAgentForm.prompt" 
             type="textarea"
-            placeholder="定义工程师的角色、专业领域、工作风格等。例如：你是一个资深的Python开发工程师，擅长代码优化、架构设计..."
+            placeholder="isEditingAgent ? '更新工程师的系统提示词...' : '定义工程师的角色、专业领域、工作风格等。例如：你是一个资深的Python开发工程师，擅长代码优化、架构设计...'"
             :autosize="{ minRows: 4, maxRows: 8 }"
           />
         </n-form-item>
         <n-form-item label="专业领域（可选）">
           <n-input 
             v-model:value="customAgentForm.expertise" 
-            placeholder="如：编程、写作、营销、设计等"
+            placeholder="isEditingAgent ? '更新专业领域...' : '如：编程、写作、营销、设计等'"
           />
         </n-form-item>
       </n-form>
       
       <template #footer>
         <n-space justify="end">
-          <n-button @click="showCustomAgentDialog = false">取消</n-button>
-          <n-button type="primary" @click="handleCreateCustomAgent" :disabled="!customAgentForm?.name?.trim() || !customAgentForm?.prompt?.trim()">
-            创建工程师
+          <n-button @click="handleCancelCustomAgentDialog">取消</n-button>
+          <n-button type="primary" @click="isEditingAgent ? handleUpdateCustomAgent() : handleCreateCustomAgent()" :disabled="!customAgentForm?.name?.trim() || !customAgentForm?.prompt?.trim()">
+            {{ isEditingAgent ? '更新工程师' : '创建工程师' }}
           </n-button>
         </n-space>
       </template>
+    </n-modal>
+
+    <!-- 删除确认对话框 -->
+    <n-modal
+      v-model:show="showDeleteAgentDialog"
+      preset="dialog"
+      title="确认删除"
+      type="warning"
+      positive-text="删除"
+      negative-text="取消"
+      @positive-click="handleDeleteCustomAgent"
+    >
+      确定要删除自定义工程师「{{ agentToDelete?.name }}」吗？此操作不可撤销。
     </n-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, watch, onMounted } from 'vue';
+import { ref, computed, nextTick, watch, onMounted, h } from 'vue';
 import { NButton, NIcon, NEmpty, NSpace, NText, NSelect, NModal, NCard, NInput, NForm, NFormItem, useMessage, useDialog } from 'naive-ui';
 import {
   SettingsOutline,
   TrashOutline,
   ChatboxOutline,
   AddCircleOutline,
+  CreateOutline,
+  PencilOutline,
 } from '@vicons/ionicons5';
 import MessageItem from './MessageItem.vue';
 import InputBox from './InputBox.vue';
@@ -219,6 +235,17 @@ const customAgentForm = ref({
   expertise: '',
 });
 
+// 编辑和删除相关状态
+const isEditingAgent = ref(false);
+const editingAgentId = ref<string | null>(null);
+const showDeleteAgentDialog = ref(false);
+const agentToDelete = ref<{ id: string; name: string; prompt: string; expertise?: string; icon: string; color: string } | null>(null);
+
+// 计算属性
+const customAgentDialogTitle = computed(() => {
+  return isEditingAgent.value ? '编辑自定义工程师' : '自定义提示词工程师';
+});
+
 // 从 localStorage 加载自定义工程师
 const loadCustomAgents = () => {
   try {
@@ -254,16 +281,143 @@ const modeOptions = [
 ];
 
 const agentOptions = computed(() => [
-  { label: '自动（Conductor）', value: 'AUTO' },
-  { label: 'X0 优化师', value: 'X0_OPTIMIZER' },
-  { label: 'X0 逆向', value: 'X0_REVERSE' },
-  { label: 'X1 基础', value: 'X1_BASIC' },
-  { label: 'X4 场景', value: 'X4_SCENARIO' },
+  { 
+    label: '自动（Conductor）', 
+    value: 'AUTO',
+    hasActions: true,
+    agentType: 'system',
+    agentId: 'AUTO',
+    agentName: 'Conductor'
+  },
+  { 
+    label: 'X0 优化师', 
+    value: 'X0_OPTIMIZER',
+    hasActions: true,
+    agentType: 'system',
+    agentId: 'X0_OPTIMIZER',
+    agentName: 'X0 优化师'
+  },
+  { 
+    label: 'X0 逆向', 
+    value: 'X0_REVERSE',
+    hasActions: true,
+    agentType: 'system',
+    agentId: 'X0_REVERSE',
+    agentName: 'X0 逆向'
+  },
+  { 
+    label: 'X1 基础', 
+    value: 'X1_BASIC',
+    hasActions: true,
+    agentType: 'system',
+    agentId: 'X1_BASIC',
+    agentName: 'X1 基础'
+  },
+  { 
+    label: 'X4 场景', 
+    value: 'X4_SCENARIO',
+    hasActions: true,
+    agentType: 'system',
+    agentId: 'X4_SCENARIO',
+    agentName: 'X4 场景'
+  },
   ...customAgents.value.map(agent => ({
     label: `🔧 ${agent.name}`,
     value: agent.id.startsWith('CUSTOM_') ? agent.id : `CUSTOM_${agent.id}`,
+    hasActions: true,
+    agentType: 'custom',
+    agentId: agent.id,
+    agentName: agent.name,
+    customAgent: true,
   })),
 ]);
+
+// 渲染Agent选择选项
+const renderAgentSelectOption = (option: any) => {
+  if (!option) return h('span', '');
+  
+  return h('div', {
+    class: 'agent-option',
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      width: '100%',
+      position: 'relative'
+    }
+  }, [
+    // Agent名称
+    h('span', {
+      style: {
+        flex: 1,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        paddingRight: '8px'
+      }
+    }, option.label || ''),
+    
+    // 操作按钮容器
+    option.hasActions ? h('div', {
+      class: 'agent-actions',
+      style: {
+        display: 'flex',
+        gap: '2px',
+        flexShrink: 0
+      }
+    }, [
+      // 编辑按钮
+      h('button', {
+        type: 'button',
+        class: 'agent-action-btn edit-btn',
+        style: {
+          background: 'none',
+          border: 'none',
+          color: '#666',
+          cursor: 'pointer',
+          padding: '2px 4px',
+          fontSize: '11px',
+          borderRadius: '3px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '20px',
+          height: '20px'
+        },
+        title: '编辑',
+        onClick: (e: MouseEvent) => {
+          e.stopPropagation();
+          handleEditAgent(option);
+        }
+      }, '✏️'),
+      
+      // 删除按钮（仅自定义Agent显示）
+      option.agentType === 'custom' ? h('button', {
+        type: 'button',
+        class: 'agent-action-btn delete-btn',
+        style: {
+          background: 'none',
+          border: 'none',
+          color: '#e74c3c',
+          cursor: 'pointer',
+          padding: '2px 4px',
+          fontSize: '11px',
+          borderRadius: '3px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '20px',
+          height: '20px'
+        },
+        title: '删除',
+        onClick: (e: MouseEvent) => {
+          e.stopPropagation();
+          handleDeleteAgent(option);
+        }
+      }, '🗑️') : null
+    ]) : null
+  ]);
+};
 
 // 消息容器
 const messagesContainer = ref<HTMLElement>();
@@ -366,12 +520,8 @@ const handleCreateCustomAgent = () => {
   // 保存到 localStorage
   saveCustomAgents();
   
-  // 重置表单
-  customAgentForm.value = {
-    name: '',
-    prompt: '',
-    expertise: '',
-  };
+  // 重置表单和状态
+  resetCustomAgentForm();
   
   showCustomAgentDialog.value = false;
   
@@ -382,6 +532,171 @@ const handleCreateCustomAgent = () => {
   
   // 通知父组件更新自定义Agent
   emit('customAgentsUpdate', customAgents.value);
+};
+
+// 重置自定义Agent表单
+const resetCustomAgentForm = () => {
+  customAgentForm.value = {
+    name: '',
+    prompt: '',
+    expertise: '',
+  };
+  isEditingAgent.value = false;
+  editingAgentId.value = null;
+};
+
+
+// 处理Agent编辑（支持系统和自定义Agent）
+const handleEditAgent = (option: any) => {
+  if (option.agentType === 'custom') {
+    // 编辑自定义Agent
+    handleEditCustomAgent(option.agentId);
+  } else {
+    // 编辑系统Agent - 显示提示对话框
+    dialog.warning({
+      title: '编辑系统Agent',
+      content: `您确定要编辑系统内置的"${option.agentName}"吗？\n\n⚠️ 注意：修改系统Agent可能会影响系统稳定性，建议仅在有经验的用户操作时进行。`,
+      positiveText: '继续编辑',
+      negativeText: '取消',
+      onPositiveClick: () => {
+        handleEditSystemAgent(option);
+      }
+    });
+  }
+};
+
+// 处理Agent删除（支持系统和自定义Agent）
+const handleDeleteAgent = (option: any) => {
+  if (option.agentType === 'custom') {
+    // 删除自定义Agent
+    const agent = customAgents.value.find(a => a.id === option.agentId);
+    if (agent) {
+      agentToDelete.value = agent;
+      showDeleteAgentDialog.value = true;
+    }
+  } else {
+    // 删除系统Agent - 显示警告对话框
+    dialog.error({
+      title: '删除系统Agent',
+      content: `⚠️ 系统内置Agent不能删除！\n\n"${option.agentName}" 是核心功能组件，删除会导致系统无法正常工作。\n\n如需临时禁用，请在自定义Agent中创建替代版本。`,
+      positiveText: '我了解了',
+      negativeText: '取消',
+      onPositiveClick: () => {
+        // 不执行任何操作，只是关闭对话框
+      }
+    });
+  }
+};
+
+// 处理系统Agent编辑
+const handleEditSystemAgent = (option: any) => {
+  message.info(`正在准备编辑 "${option.agentName}" 的配置...`);
+  // TODO: 这里可以实现系统Agent的编辑功能
+  // 目前先显示一个提示，后续可以扩展为真正的编辑功能
+  message.warning('系统Agent编辑功能正在开发中，敬请期待！');
+};
+
+// 编辑自定义Agent
+const handleEditCustomAgent = (agentId: string) => {
+  const agent = customAgents.value.find(a => a.id === agentId);
+  if (!agent) {
+    message.error('未找到要编辑的工程师');
+    return;
+  }
+
+  console.log('🔧 编辑自定义Agent:', agent);
+  
+  // 设置表单数据
+  customAgentForm.value = {
+    name: agent.name,
+    prompt: agent.prompt,
+    expertise: agent.expertise || '',
+  };
+  
+  // 设置编辑状态
+  isEditingAgent.value = true;
+  editingAgentId.value = agentId;
+  showCustomAgentDialog.value = true;
+};
+
+// 更新自定义Agent
+const handleUpdateCustomAgent = () => {
+  if (!editingAgentId.value) {
+    message.error('编辑状态异常');
+    return;
+  }
+
+  // 安全检查表单数据
+  if (!customAgentForm.value || !customAgentForm.value.name || !customAgentForm.value.prompt) {
+    message.warning('请填写完整的工程师信息');
+    return;
+  }
+
+  const agentIndex = customAgents.value.findIndex(a => a.id === editingAgentId.value);
+  if (agentIndex === -1) {
+    message.error('未找到要更新的工程师');
+    return;
+  }
+
+  // 更新Agent数据
+  customAgents.value[agentIndex] = {
+    ...customAgents.value[agentIndex],
+    name: customAgentForm.value.name,
+    prompt: customAgentForm.value.prompt,
+    expertise: customAgentForm.value.expertise,
+  };
+
+  // 保存到 localStorage
+  saveCustomAgents();
+  
+  // 重置表单和状态
+  resetCustomAgentForm();
+  
+  showCustomAgentDialog.value = false;
+  
+  message.success(`自定义工程师 "${customAgentForm.value.name}" 更新成功！`);
+  
+  // 通知父组件更新自定义Agent
+  emit('customAgentsUpdate', customAgents.value);
+};
+
+// 删除自定义Agent
+const handleDeleteCustomAgent = () => {
+  if (!agentToDelete.value) {
+    message.error('删除状态异常');
+    return;
+  }
+
+  console.log('🗑️ 删除自定义Agent:', agentToDelete.value);
+
+  // 从列表中移除
+  const agentIndex = customAgents.value.findIndex(a => a.id === agentToDelete.value?.id);
+  if (agentIndex !== -1) {
+    customAgents.value.splice(agentIndex, 1);
+    
+    // 保存到 localStorage
+    saveCustomAgents();
+    
+    // 如果当前选择的是要删除的Agent，重置为AUTO
+    if (forcedAgent.value === `CUSTOM_${agentToDelete.value.id}`) {
+      forcedAgent.value = 'AUTO';
+    }
+    
+    message.success(`自定义工程师 "${agentToDelete.value.name}" 已删除`);
+    
+    // 通知父组件更新自定义Agent
+    emit('customAgentsUpdate', customAgents.value);
+  }
+
+  // 重置删除状态
+  agentToDelete.value = null;
+  showDeleteAgentDialog.value = false;
+};
+
+// 取消自定义Agent对话框
+const handleCancelCustomAgentDialog = () => {
+  resetCustomAgentForm();
+  showCustomAgentDialog.value = false;
 };
 
 // 示例提示
@@ -585,6 +900,41 @@ onMounted(() => {
 .message-enter-from {
   opacity: 0;
   transform: translateY(30px);
+}
+
+/* Agent选择框悬停效果 */
+.agent-option {
+  position: relative;
+}
+
+.agent-option .agent-actions {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.agent-option:hover .agent-actions {
+  opacity: 1;
+}
+
+.agent-action-btn {
+  opacity: 0.7;
+  transition: all 0.2s ease;
+}
+
+.agent-action-btn:hover {
+  opacity: 1 !important;
+  background-color: rgba(0, 0, 0, 0.05) !important;
+  transform: scale(1.1);
+}
+
+.edit-btn:hover {
+  background-color: rgba(102, 126, 234, 0.1) !important;
+  color: #667eea !important;
+}
+
+.delete-btn:hover {
+  background-color: rgba(231, 76, 60, 0.1) !important;
+  color: #e74c3c !important;
 }
 </style>
 

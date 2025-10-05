@@ -38,6 +38,32 @@ const showWelcome = ref(false);
 let llmService = null;
 let routerService = null;
 /**
+ * 注册自定义Agent到RouterService
+ */
+const registerCustomAgents = (agents) => {
+    if (!routerService || !llmService) {
+        console.warn('⚠️ 服务未初始化，无法注册自定义Agent');
+        return;
+    }
+    try {
+        // 注册新的自定义Agent
+        agents.forEach(agent => {
+            const agentConfig = {
+                id: agent.id, // 直接使用原始ID，不做前缀处理
+                name: agent.name,
+                prompt: agent.prompt,
+                expertise: agent.expertise,
+            };
+            console.log('🔧 注册自定义Agent:', agentConfig.name, 'ID:', agentConfig.id);
+            routerService.registerCustomAgent(agentConfig);
+        });
+        console.log('✅ 自定义Agent注册完成');
+    }
+    catch (error) {
+        console.error('❌ 自定义Agent注册失败:', error);
+    }
+};
+/**
  * 初始化服务
  */
 const initializeServices = () => {
@@ -339,32 +365,6 @@ const handleDeleteMessage = (messageToDelete) => {
     }
     else {
         message.error('未找到要删除的消息');
-    }
-};
-/**
- * 注册自定义Agent到RouterService
- */
-const registerCustomAgents = (agents) => {
-    if (!routerService || !llmService) {
-        console.warn('⚠️ 服务未初始化，无法注册自定义Agent');
-        return;
-    }
-    try {
-        // 注册新的自定义Agent
-        agents.forEach(agent => {
-            const agentConfig = {
-                id: agent.id, // 直接使用原始ID，不做前缀处理
-                name: agent.name,
-                prompt: agent.prompt,
-                expertise: agent.expertise,
-            };
-            console.log('🔧 注册自定义Agent:', agentConfig.name, 'ID:', agentConfig.id);
-            routerService.registerCustomAgent(agentConfig);
-        });
-        console.log('✅ 自定义Agent注册完成');
-    }
-    catch (error) {
-        console.error('❌ 自定义Agent注册失败:', error);
     }
 };
 /**
