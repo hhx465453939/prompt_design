@@ -112,15 +112,19 @@ pnpm dev
 
 #### 1. 用户界面层
 - **ChatWindow**: 主对话界面，支持流式响应
-- **AgentSelector**: Agent选择和自定义Agent创建
-- **SessionManager**: 会话管理和批量操作
+- **ChatSidebar**: 会话管理和批量操作
+- **MessageItem**: 消息显示组件
+- **InputBox**: 智能输入框
 - **ConfigPanel**: 系统配置管理
+- **CustomProviderManager**: 自定义提供商管理
 
 #### 2. 核心服务层
 - **RouterService**: 智能路由服务，根据意图调度Agent
 - **ConductorAgent**: 前导Agent，负责意图识别和路由决策
-- **专家Agent**: X0-X4系列专业Agent
+- **专家Agent**: X0-X4系列专业Agent + 自定义Agent
 - **LLMService**: 统一大模型调用接口
+- **AgentManager**: Agent生命周期管理
+- **PromptManager**: 提示词管理服务
 - **StorageService**: 数据持久化服务
 
 #### 3. Agent矩阵
@@ -129,6 +133,7 @@ pnpm dev
 - **X1_BASIC**: 基础工程师 - 通用Agent设计（ATOM框架）
 - **X4_SCENARIO**: 场景工程师 - 场景化Agent设计
 - **CUSTOM**: 自定义Agent - 用户自定义提示词工程师
+- **AgentIndicator**: Agent类型指示器组件
 
 ---
 
@@ -145,27 +150,32 @@ pnpm dev
 
 ```
 prompt_design/
-├── packages/
-│   ├── core/           # 核心服务层
-│   │   ├── src/
-│   │   │   ├── agents/     # Agent实现
-│   │   │   ├── services/   # 服务层
-│   │   │   └── types/      # 类型定义
-│   │   └── dist/           # 构建输出
-│   ├── ui/             # UI组件库
-│   │   ├── src/
-│   │   │   ├── components/ # Vue组件
-│   │   │   ├── composables/ # 组合式函数
-│   │   │   └── types/      # UI类型
-│   │   └── dist/           # 构建输出
-│   └── web/            # Web应用
-│       ├── src/
-│       │   ├── AppContent.vue
-│       │   └── main.ts
-│       └── dist/           # 构建输出
-├── agent_matrix/          # Agent提示词模板
-├── docs/                  # 项目文档
-└── CLAUDE.md             # Claude Code 配置
+├── packages/                    # 核心代码包
+│   ├── core/                   # 核心服务层
+│   │   ├── src/agents/         # Agent实现
+│   │   ├── src/services/       # 服务层
+│   │   ├── src/types/          # 类型定义
+│   │   └── dist/               # 构建输出
+│   ├── ui/                     # UI组件库
+│   │   ├── src/components/     # Vue组件
+│   │   ├── src/composables/    # 组合式函数
+│   │   ├── src/types/          # UI类型
+│   │   └── dist/               # 构建输出
+│   └── web/                    # Web应用
+│       ├── src/                # 应用源码
+│       └── dist/               # 构建输出
+├── agent_matrix/               # Agent矩阵模板
+│   ├── X0_optimizer/           # X0优化师模板
+│   ├── X0_reverse/             # X0逆向工程师模板
+│   ├── X1_basic/               # X1基础工程师模板
+│   ├── X4_scenario/            # X4场景工程师模板
+│   └── docs/                   # 矩阵架构文档
+├── docs/                       # 项目文档
+├── logs/                       # 日志文件
+├── test/                       # 测试文件
+├── env.example                 # 环境变量模板
+├── package.json                # 项目配置
+└── pnpm-workspace.yaml         # Monorepo配置
 ```
 
 ### 常用命令
@@ -213,6 +223,8 @@ echo "DEBUG_MODE=true" > .env.local
 console.log('Agent选择:', forcedAgent);
 console.log('可用Agent:', Array.from(routerService.agents.keys()));
 console.log('路由决策:', decision);
+console.log('流式输出状态:', streamingMsg.streaming);
+console.log('会话历史:', chatStore.messages.value.length);
 ```
 
 ---
@@ -281,7 +293,9 @@ console.log('路由决策:', decision);
 #### 消息管理
 - **单条删除**: 删除特定消息（删除用户消息时同时删除对应回复）
 - **会话重命名**: 自定义会话标题
-- **消息导出**: 支持Markdown格式导出
+- **消息导出**: 支持Markdown格式导出和复制
+- **消息重新生成**: 支持重新生成回复
+- **测试模式**: 支持自由聊天模式测试提示词
 - **历史搜索**: 快速查找历史内容
 
 ---
@@ -387,7 +401,7 @@ CMD ["pnpm", "preview"]
 
 ## 📝 更新日志
 
-### v0.1.0 (2025-10-05)
+### v0.1.0-20251005 (2025-10-05)
 
 #### ✅ 新增功能
 - **智能Agent矩阵系统**: 完整的前导Agent+专家Agent架构
@@ -401,6 +415,8 @@ CMD ["pnpm", "preview"]
 - **TypeScript**: 完整的类型安全
 - **Vue 3 + Naive UI**: 现代化前端技术栈
 - **模块化设计**: 核心服务与UI分离
+- **流式响应**: 实时显示AI思考过程
+- **多模型支持**: 支持DeepSeek、OpenAI等主流模型
 
 #### 🎯 核心Agent
 - **ConductorAgent**: 意图识别与路由调度
@@ -409,12 +425,13 @@ CMD ["pnpm", "preview"]
 - **X1_BASIC**: 基础工程师
 - **X4_SCENARIO**: 场景工程师
 - **CustomAgent**: 自定义Agent支持
+- **AgentIndicator**: Agent类型指示器
 
 ---
 
 ## 📄 许可证
 
-MIT License
+Apache License 2.0
 
 ---
 
