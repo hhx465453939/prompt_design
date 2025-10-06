@@ -212,6 +212,17 @@ pnpm test:core           # 单独测试core包
 pnpm clean               # 清理所有构建产物
 pnpm clean:dist          # 清理dist目录
 pnpm clean:vite          # 清理Vite缓存
+
+# 删除所有 node_modules
+Remove-Item -Path "node_modules" -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item -Path "packages\*\node_modules" -Recurse -Force -ErrorAction SilentlyContinue
+
+# 清理 pnpm 缓存
+pnpm store prune
+
+# 重新安装
+pnpm install
+
 ```
 
 ---
