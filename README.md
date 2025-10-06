@@ -160,7 +160,7 @@ prompt_design/
 
 #### 1. 克隆项目
 ```bash
-git clone <repository-url>
+git clone https://github.com/hhx465453939/prompt_design.git
 cd prompt_design
 ```
 
@@ -731,7 +731,7 @@ prompt_design/
 ## 🚀 快速体验
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/hhx465453939/prompt_design.git
 cd prompt_design
 pnpm install
 cp env.example .env.local
