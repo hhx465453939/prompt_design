@@ -35,6 +35,9 @@ npm run build
 
 # 5) 本地预览（部署前 smoke test）
 pnpm -F @prompt-matrix/web preview --host 0.0.0.0 --port 3000
+
+# 5) 运行开发部署
+npm run dev
 ```
 
 默认预览地址：`http://localhost:3000`
