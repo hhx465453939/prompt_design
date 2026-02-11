@@ -1,13 +1,20 @@
 /**
- * 配置状态管理
+ * Config state store.
  */
 
 import { ref, computed } from 'vue';
 import type { UserConfig } from '../types';
 
 const STORAGE_KEY = 'prompt-matrix-config';
+const RUNTIME_ENV_KEY = '__PROMPT_MATRIX_ENV__';
+const PROVIDER_DEFAULT_BASE_URLS: Record<UserConfig['provider'], string> = {
+  deepseek: 'https://api.deepseek.com/v1',
+  openai: 'https://api.openai.com/v1',
+  gemini: 'https://generativelanguage.googleapis.com/v1beta',
+  openrouter: 'https://openrouter.ai/api/v1',
+  custom: '',
+};
 
-// 默认配置
 const defaultConfig: UserConfig = {
   provider: 'deepseek',
   apiKey: '',
@@ -18,27 +25,76 @@ const defaultConfig: UserConfig = {
   topP: 0.95,
 };
 
+type RuntimeEnv = Partial<Record<string, string>>;
+
+function normalizeBaseURL(provider: UserConfig['provider'], baseURL?: string): string {
+  const raw = (baseURL || '').trim();
+  if (!raw) {
+    return PROVIDER_DEFAULT_BASE_URLS[provider] || '';
+  }
+
+  const trimmed = raw.replace(/\/+$/, '');
+  if (provider === 'deepseek' || provider === 'openai' || provider === 'openrouter') {
+    return /\/v\d+($|\/)/i.test(trimmed) ? trimmed : `${trimmed}/v1`;
+  }
+  return trimmed;
+}
+
+function getRuntimeEnv(): RuntimeEnv | null {
+  const env = (globalThis as any)[RUNTIME_ENV_KEY];
+  if (!env || typeof env !== 'object') return null;
+  return env as RuntimeEnv;
+}
+
+/**
+ * Read DeepSeek bootstrap config from runtime env.
+ */
+function getEnvConfig(): Partial<UserConfig> | null {
+  const runtimeEnv = getRuntimeEnv();
+  if (!runtimeEnv) return null;
+
+  const apiKey = runtimeEnv.VITE_DEEPSEEK_API_KEY;
+  if (!apiKey) return null;
+
+  return {
+    provider: 'deepseek',
+    apiKey,
+    model: runtimeEnv.DEFAULT_EXPERT_MODEL || 'deepseek-chat',
+    baseURL: normalizeBaseURL('deepseek', runtimeEnv.VITE_DEEPSEEK_BASE_URL),
+  };
+}
+
+function getStoredConfig(): Partial<UserConfig> | null {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return null;
+
+    const parsed = JSON.parse(stored) as Partial<UserConfig>;
+    if (parsed.provider) {
+      parsed.baseURL = normalizeBaseURL(parsed.provider, parsed.baseURL);
+    }
+    return parsed;
+  } catch (error) {
+    console.error('Failed to load config:', error);
+    return null;
+  }
+}
+
 export function useConfigStore() {
   const config = ref<UserConfig>(loadConfig());
 
-  /**
-   * 是否已配置
-   */
   const isConfigured = computed(() => {
     return !!config.value.apiKey && !!config.value.model;
   });
 
-  /**
-   * 保存配置
-   */
   const saveConfig = (newConfig: UserConfig) => {
-    config.value = { ...newConfig };
+    config.value = {
+      ...newConfig,
+      baseURL: normalizeBaseURL(newConfig.provider, newConfig.baseURL),
+    };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(config.value));
   };
 
-  /**
-   * 重置配置
-   */
   const resetConfig = () => {
     config.value = { ...defaultConfig };
     localStorage.removeItem(STORAGE_KEY);
@@ -53,35 +109,33 @@ export function useConfigStore() {
 }
 
 /**
- * 从 localStorage 加载配置
+ * Priority: WebUI(localStorage) > runtime env > default.
  */
 function loadConfig(): UserConfig {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      return { ...defaultConfig, ...parsed };
-    }
-  } catch (error) {
-    console.error('Failed to load config:', error);
+  const envConfig = getEnvConfig() || {};
+  const storedConfig = getStoredConfig() || {};
+
+  const finalConfig: UserConfig = {
+    ...defaultConfig,
+    ...envConfig,
+    ...storedConfig,
+  };
+  finalConfig.baseURL = normalizeBaseURL(finalConfig.provider, finalConfig.baseURL);
+
+  if (storedConfig.apiKey) {
+    console.log('Using localStorage config (higher priority than runtime env)');
+    return finalConfig;
   }
 
-  // 尝试从环境变量加载
-  if (import.meta.env) {
-    const envConfig: Partial<UserConfig> = {};
-    
-    if (import.meta.env.VITE_DEEPSEEK_API_KEY) {
-      envConfig.provider = 'deepseek';
-      envConfig.apiKey = import.meta.env.VITE_DEEPSEEK_API_KEY;
-      envConfig.baseURL = import.meta.env.VITE_DEEPSEEK_BASE_URL || 'https://api.deepseek.com';
-      envConfig.model = import.meta.env.DEFAULT_EXPERT_MODEL || 'deepseek-chat';
-    }
-
-    if (Object.keys(envConfig).length > 0) {
-      return { ...defaultConfig, ...envConfig };
-    }
+  if (envConfig.apiKey) {
+    console.log('Using runtime env config:', {
+      provider: finalConfig.provider,
+      baseURL: finalConfig.baseURL,
+      model: finalConfig.model,
+      hasApiKey: !!finalConfig.apiKey,
+    });
+    return finalConfig;
   }
 
-  return defaultConfig;
+  return { ...defaultConfig };
 }
-

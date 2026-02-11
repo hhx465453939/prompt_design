@@ -48,16 +48,18 @@ export class RouterService {
    * 注册自定义Agent
    */
   registerCustomAgent(config: CustomAgentConfig) {
-    const agentType = `CUSTOM_${config.id}` as AgentType;
+    // 确保 ID 不会产生重复的 CUSTOM_ 前缀
+    const cleanId = config.id.startsWith('CUSTOM_') ? config.id : `CUSTOM_${config.id}`;
+    const agentType = cleanId as AgentType;
     const customAgent = new CustomAgent(config, this.llmService);
     this.agents.set(agentType, customAgent);
-    
+
     console.log('🔧 RouterService.registerCustomAgent:');
     console.log('  - 配置ID:', config.id);
     console.log('  - 生成的AgentType:', agentType);
     console.log('  - 当前所有Agent:', Array.from(this.agents.keys()));
     console.log('  - 自定义Agent数量:', this.agents.size);
-    
+
     logger.info(`Custom agent registered: ${config.name} (${agentType})`);
   }
 

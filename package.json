@@ -5,7 +5,7 @@
   "description": "智能提示词工程师代理系统 - Agent矩阵架构",
   "packageManager": "pnpm@10.6.1",
   "engines": {
-    "node": "^18.0.0 || ^20.0.0 || ^22.0.0",
+    "node": "^18.0.0 || ^20.0.0 || ^22.0.0 || ^24.0.0",
     "npm": "请使用pnpm代替npm",
     "yarn": "请使用pnpm代替yarn"
   },

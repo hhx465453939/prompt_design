@@ -1,6 +1,7 @@
 import { createApp } from 'vue';
 import App from './App.vue';
-// 导入 UI 组件库样式
 import '@prompt-matrix/ui/style.css';
+// Inject Vite runtime env for prebuilt workspace packages (e.g. @prompt-matrix/ui).
+window.__PROMPT_MATRIX_ENV__ = { ...import.meta.env };
 const app = createApp(App);
 app.mount('#app');

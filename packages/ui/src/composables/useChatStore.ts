@@ -1,21 +1,25 @@
 /**
- * 聊天状态管理
+ * Chat state store.
  */
 
-import { ref, watch } from 'vue';
+import { ref } from 'vue';
 import type { ChatMessage } from '../types';
+
+let messageIdSeed = 0;
+
+function nextMessageId(prefix = 'msg'): string {
+  messageIdSeed = (messageIdSeed + 1) % 1_000_000;
+  return `${prefix}-${Date.now()}-${messageIdSeed}`;
+}
 
 export function useChatStore() {
   const STORAGE_KEY = 'prompt-matrix-chat-history';
   const messages = ref<ChatMessage[]>(loadHistory());
   const loading = ref(false);
 
-  /**
-   * 添加用户消息
-   */
   const addUserMessage = (content: string): ChatMessage => {
     const message: ChatMessage = {
-      id: Date.now().toString(),
+      id: nextMessageId('user'),
       role: 'user',
       content,
       timestamp: Date.now(),
@@ -25,9 +29,6 @@ export function useChatStore() {
     return message;
   };
 
-  /**
-   * 添加助手消息
-   */
   const addAssistantMessage = (
     content: string,
     options?: {
@@ -39,7 +40,7 @@ export function useChatStore() {
     }
   ): ChatMessage => {
     const message: ChatMessage = {
-      id: Date.now().toString(),
+      id: nextMessageId('assistant'),
       role: 'assistant',
       content,
       timestamp: Date.now(),
@@ -50,12 +51,9 @@ export function useChatStore() {
     return message;
   };
 
-  /**
-   * 添加加载中消息
-   */
   const addLoadingMessage = (): ChatMessage => {
     const message: ChatMessage = {
-      id: `loading-${Date.now()}`,
+      id: nextMessageId('loading'),
       role: 'assistant',
       content: '正在思考中...',
       timestamp: Date.now(),
@@ -67,20 +65,14 @@ export function useChatStore() {
     return message;
   };
 
-  /**
-   * 移除加载中消息
-   */
   const removeLoadingMessage = () => {
     messages.value = messages.value.filter((m) => !m.isLoading);
     persist();
   };
 
-  /**
-   * 添加错误消息
-   */
   const addErrorMessage = (error: string): ChatMessage => {
     const message: ChatMessage = {
-      id: Date.now().toString(),
+      id: nextMessageId('error'),
       role: 'assistant',
       content: error,
       timestamp: Date.now(),
@@ -91,9 +83,6 @@ export function useChatStore() {
     return message;
   };
 
-  /**
-   * 清空历史
-   */
   const clearMessages = () => {
     messages.value = [];
     persist();
@@ -125,4 +114,3 @@ export function useChatStore() {
     clearMessages,
   };
 }
-

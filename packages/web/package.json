@@ -7,24 +7,25 @@
     "dev": "vite",
     "build": "vue-tsc && vite build",
     "preview": "vite preview",
-    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
-    "lint:fix": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore"
+    "lint": "eslint . --fix",
+    "lint:fix": "eslint . --fix"
   },
   "dependencies": {
     "@prompt-matrix/core": "workspace:*",
     "@prompt-matrix/ui": "workspace:*",
-    "vue": "^3.5.13",
+    "@vicons/ionicons5": "^0.12.0",
     "naive-ui": "^2.40.1",
-    "@vicons/ionicons5": "^0.12.0"
+    "vue": "^3.5.13"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@vitejs/plugin-vue": "^5.2.1",
     "@vue/eslint-config-typescript": "^14.1.3",
     "eslint": "^9.18.0",
     "eslint-plugin-vue": "^9.32.0",
     "typescript": "^5.8.2",
+    "typescript-eslint": "^8.55.0",
     "vite": "^6.0.5",
     "vue-tsc": "^2.2.0"
   }
 }
-
