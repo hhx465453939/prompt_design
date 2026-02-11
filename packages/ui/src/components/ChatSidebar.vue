@@ -1,15 +1,14 @@
 <template>
   <div class="chat-sidebar">
-    <!-- 侧边栏头部 -->
     <div class="sidebar-header">
       <h3 class="sidebar-title">聊天记录</h3>
       <div class="sidebar-actions">
-        <n-button quaternary circle size="small" @click="handleBatchActions" title="批量操作">
+        <n-button quaternary circle size="small" @click="showBatchActionsDialog = true" title="批量操作">
           <template #icon>
             <n-icon><SettingsOutline /></n-icon>
           </template>
         </n-button>
-        <n-button quaternary circle size="small" @click="handleNewChat">
+        <n-button quaternary circle size="small" @click="handleNewChat" title="新建对话">
           <template #icon>
             <n-icon><AddOutline /></n-icon>
           </template>
@@ -17,29 +16,30 @@
       </div>
     </div>
 
-    <!-- 聊天会话列表 -->
     <div class="sessions-list">
       <div
         v-for="session in sessions"
         :key="session.id"
-        :class="['session-item', { active: session.id === currentSessionId, selected: isSelectMode && selectedSessions.includes(session.id) }]"
-        @click="handleSessionClick(session)"
+        :class="[
+          'session-item',
+          { active: session.id === currentSessionId, selected: isSelectMode && selectedSessions.includes(session.id) },
+        ]"
+        @click="handleSessionClick(session.id)"
       >
-        <!-- 选择框 -->
         <div v-if="isSelectMode" class="session-checkbox">
-          <n-checkbox :checked="selectedSessions.includes(session.id)" @update:checked="toggleSessionSelection(session.id, $event)" />
+          <n-checkbox
+            :checked="selectedSessions.includes(session.id)"
+            @update:checked="toggleSessionSelection(session.id, $event)"
+          />
         </div>
-        
+
         <div class="session-content">
           <div class="session-title">{{ session.title }}</div>
           <div class="session-time">{{ formatTime(session.updatedAt) }}</div>
         </div>
-        <div class="session-actions" @click.stop v-if="!isSelectMode">
-          <n-dropdown
-            :options="getSessionMenuOptions(session.id)"
-            placement="bottom-end"
-            @select="handleSessionAction"
-          >
+
+        <div class="session-actions" v-if="!isSelectMode" @click.stop>
+          <n-dropdown :options="getSessionMenuOptions(session.id)" placement="bottom-end">
             <n-button quaternary circle size="tiny">
               <template #icon>
                 <n-icon><EllipsisVerticalOutline /></n-icon>
@@ -49,13 +49,11 @@
         </div>
       </div>
 
-      <!-- 空状态 -->
       <div v-if="sessions.length === 0" class="empty-sessions">
         <n-empty description="暂无聊天记录" size="small" />
       </div>
     </div>
 
-    <!-- 重命名对话框 -->
     <n-modal
       v-model:show="showRenameDialog"
       preset="dialog"
@@ -71,7 +69,6 @@
       />
     </n-modal>
 
-    <!-- 删除确认对话框 -->
     <n-modal
       v-model:show="showDeleteDialog"
       preset="dialog"
@@ -84,13 +81,7 @@
       确定要删除这个对话吗？此操作不可撤销。
     </n-modal>
 
-    <!-- 批量操作对话框 -->
-    <n-modal
-      v-model:show="showBatchActionsDialog"
-      preset="card"
-      title="批量操作"
-      style="width: 400px;"
-    >
+    <n-modal v-model:show="showBatchActionsDialog" preset="card" title="批量操作" style="width: 400px">
       <n-space vertical>
         <n-button @click="handleExportAllSessions" :disabled="sessions.length === 0">
           <template #icon>
@@ -98,15 +89,19 @@
           </template>
           导出所有聊天记录
         </n-button>
-        
-              </n-space>
-      
+      </n-space>
+
       <template #footer>
         <n-space justify="end">
           <n-button @click="toggleSelectMode" :type="isSelectMode ? 'primary' : 'default'">
             {{ isSelectMode ? '取消选择' : '多选模式' }}
           </n-button>
-          <n-button @click="handleDeleteSelected" type="error" :disabled="selectedSessions.length === 0" v-if="isSelectMode">
+          <n-button
+            v-if="isSelectMode"
+            type="error"
+            :disabled="selectedSessions.length === 0"
+            @click="handleDeleteSelected"
+          >
             删除选中 ({{ selectedSessions.length }})
           </n-button>
           <n-button @click="showBatchActionsDialog = false">关闭</n-button>
@@ -133,10 +128,9 @@ import {
   AddOutline,
   EllipsisVerticalOutline,
   SettingsOutline,
-  TrashOutline,
   DownloadOutline,
 } from '@vicons/ionicons5';
-import { useChatHistory, type ChatSession } from '../composables/useChatHistory';
+import { useChatHistory } from '../composables/useChatHistory';
 
 interface Emits {
   (e: 'newChat'): void;
@@ -146,106 +140,68 @@ interface Emits {
 const emit = defineEmits<Emits>();
 const message = useMessage();
 
-const {
-  sessions,
-  currentSessionId,
-  createSession,
-  switchSession,
-  deleteSession,
-  renameSession,
-} = useChatHistory();
+const { sessions, currentSessionId, createSession, switchSession, deleteSession, renameSession } = useChatHistory();
 
-// 对话框状态
 const showRenameDialog = ref(false);
 const showDeleteDialog = ref(false);
 const showBatchActionsDialog = ref(false);
-const selectedSessionId = ref<string>('');
+const selectedSessionId = ref('');
 const newSessionTitle = ref('');
 
-// 选择模式状态
 const isSelectMode = ref(false);
 const selectedSessions = ref<string[]>([]);
 
-// 处理新建聊天
 const handleNewChat = () => {
-  // console.log('🆕 创建新会话...');
-  const newSession = createSession();
-  // console.log('✅ 新会话已创建:', newSession.id);
+  createSession();
   emit('newChat');
 };
 
-// 处理选择会话
 const handleSelectSession = (sessionId: string) => {
   if (sessionId === currentSessionId.value) return;
-  
-  const messages = switchSession(sessionId);
+  switchSession(sessionId);
   emit('selectSession', sessionId);
 };
 
-// 处理会话点击（选择模式 vs 普通模式）
-const handleSessionClick = (session: any) => {
+const handleSessionClick = (sessionId: string) => {
   if (isSelectMode.value) {
-    // 选择模式：切换选择状态
-    toggleSessionSelection(session.id, !selectedSessions.value.includes(session.id));
-  } else {
-    // 普通模式：切换会话
-    handleSelectSession(session.id);
+    toggleSessionSelection(sessionId, !selectedSessions.value.includes(sessionId));
+    return;
   }
+  handleSelectSession(sessionId);
 };
 
-// 切换选择模式
 const toggleSelectMode = () => {
   isSelectMode.value = !isSelectMode.value;
-  if (!isSelectMode.value) {
-    // 退出选择模式时清空选择
-    selectedSessions.value = [];
-  }
+  if (!isSelectMode.value) selectedSessions.value = [];
 };
 
-// 切换会话选择状态
 const toggleSessionSelection = (sessionId: string, checked: boolean) => {
   if (checked) {
-    if (!selectedSessions.value.includes(sessionId)) {
-      selectedSessions.value.push(sessionId);
-    }
-  } else {
-    const index = selectedSessions.value.indexOf(sessionId);
-    if (index > -1) {
-      selectedSessions.value.splice(index, 1);
-    }
+    if (!selectedSessions.value.includes(sessionId)) selectedSessions.value.push(sessionId);
+    return;
   }
+  selectedSessions.value = selectedSessions.value.filter((id) => id !== sessionId);
 };
 
-// 删除选中的会话
 const handleDeleteSelected = () => {
   try {
     const deletedCount = selectedSessions.value.length;
-    
-    // console.log(`🗑️ 开始删除 ${deletedCount} 个会话...`);
-    
-    // 逐个删除选中的会话
-    selectedSessions.value.forEach(sessionId => {
-      deleteSession(sessionId);
-    });
-    
+    selectedSessions.value.forEach((sessionId) => deleteSession(sessionId));
+
     selectedSessions.value = [];
     isSelectMode.value = false;
-    
-    message.success(`已删除 ${deletedCount} 个聊天记录`);
     showBatchActionsDialog.value = false;
-    
-    // console.log('✅ 批量删除完成，剩余会话数:', sessions.value.length);
-    // 注意：不自动创建新会话，让用户在需要时手动创建
-    
+
+    emit('selectSession', currentSessionId.value || '');
+    message.success(`已删除 ${deletedCount} 个聊天记录`);
   } catch (error) {
-    console.error('删除失败:', error);
+    console.error('Delete sessions failed:', error);
     message.error('删除失败，请重试');
   }
 };
 
-// 获取会话菜单选项
 const getSessionMenuOptions = (sessionId: string) => {
-  const session = sessions.value.find(s => s.id === sessionId);
+  const session = sessions.value.find((s) => s.id === sessionId);
   return [
     {
       label: '重命名',
@@ -272,35 +228,27 @@ const getSessionMenuOptions = (sessionId: string) => {
   ];
 };
 
-// 处理会话操作
-const handleSessionAction = (key: string) => {
-  // 这个函数目前由菜单选项的onClick处理
-  // console.log('Session action:', key);
-};
-
-// 处理重命名会话
 const handleRenameSession = () => {
-  if (!newSessionTitle.value.trim()) {
+  const title = newSessionTitle.value.trim();
+  if (!title) {
     message.warning('请输入对话名称');
     return false;
   }
 
-  renameSession(selectedSessionId.value, newSessionTitle.value.trim());
+  renameSession(selectedSessionId.value, title);
   showRenameDialog.value = false;
   message.success('重命名成功');
   return true;
 };
 
-// 处理删除会话
 const handleDeleteSession = () => {
   deleteSession(selectedSessionId.value);
   showDeleteDialog.value = false;
-  message.success('删除成功');
   emit('selectSession', currentSessionId.value || '');
+  message.success('删除成功');
   return true;
 };
 
-// 格式化时间
 const formatTime = (timestamp: number) => {
   const date = new Date(timestamp);
   const now = new Date();
@@ -308,33 +256,18 @@ const formatTime = (timestamp: number) => {
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
   if (days === 0) {
-    return date.toLocaleTimeString('zh-CN', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } else if (days === 1) {
-    return '昨天';
-  } else if (days < 7) {
-    return `${days}天前`;
-  } else {
-    return date.toLocaleDateString('zh-CN', {
-      month: '2-digit',
-      day: '2-digit',
-    });
+    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
   }
+  if (days === 1) return '昨天';
+  if (days < 7) return `${days}天前`;
+  return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
 };
 
-// 处理批量操作
-const handleBatchActions = () => {
-  showBatchActionsDialog.value = true;
-};
-
-// 导出所有聊天记录
 const handleExportAllSessions = () => {
   try {
     const exportData = {
       exportDate: new Date().toISOString(),
-      sessions: sessions.value.map(session => ({
+      sessions: sessions.value.map((session) => ({
         id: session.id,
         title: session.title,
         createdAt: session.createdAt,
@@ -343,10 +276,7 @@ const handleExportAllSessions = () => {
       })),
     };
 
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
-      type: 'application/json',
-    });
-    
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -354,15 +284,14 @@ const handleExportAllSessions = () => {
     a.download = `chat-history-${timestamp}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    
-    message.success(`已导出 ${sessions.value.length} 个聊天记录`);
+
     showBatchActionsDialog.value = false;
+    message.success(`已导出 ${sessions.value.length} 个聊天记录`);
   } catch (error) {
-    console.error('导出失败:', error);
+    console.error('Export sessions failed:', error);
     message.error('导出失败，请重试');
   }
 };
-
 </script>
 
 <style scoped>

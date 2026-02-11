@@ -88,6 +88,15 @@ export function useChatStore() {
     persist();
   };
 
+  const setMessages = (newMessages: ChatMessage[]) => {
+    messages.value = [...newMessages];
+    persist();
+  };
+
+  const persistMessages = () => {
+    persist();
+  };
+
   function persist() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(messages.value));
@@ -112,5 +121,7 @@ export function useChatStore() {
     removeLoadingMessage,
     addErrorMessage,
     clearMessages,
+    setMessages,
+    persistMessages,
   };
 }

@@ -323,7 +323,7 @@ const handleSaveConfig = (config: UIUserConfig) => {
  * 加载会话
  */
 const handleLoadSession = (messages: any[]) => {
-  chatStore.messages.value = messages;
+  chatStore.setMessages(messages);
   if (routerService) {
     routerService.clearHistory();
     // 将历史消息添加到路由服务的历史记录中
@@ -476,6 +476,8 @@ const handleDeleteMessage = (messageToDelete: ChatMessage) => {
       }
     }
     
+    chatStore.persistMessages();
+
     message.success('消息已删除');
   } else {
     message.error('未找到要删除的消息');
@@ -624,4 +626,3 @@ ul {
   line-height: 1.8;
 }
 </style>
-

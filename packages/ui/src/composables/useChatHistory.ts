@@ -1,5 +1,7 @@
 /**
- * 聊天历史管理
+ * Chat session history store.
+ * This module keeps a singleton state so multiple components do not overwrite
+ * each other with stale copies.
  */
 
 import { ref, computed } from 'vue';
@@ -13,136 +15,146 @@ export interface ChatSession {
   updatedAt: number;
 }
 
-export function useChatHistory() {
-  const STORAGE_KEY = 'prompt-matrix-chat-sessions';
-  const CURRENT_SESSION_KEY = 'prompt-matrix-current-session';
-  
-  const sessions = ref<ChatSession[]>(loadSessions());
-  const currentSessionId = ref<string | null>(
-    localStorage.getItem(CURRENT_SESSION_KEY) || null
-  );
+const STORAGE_KEY = 'prompt-matrix-chat-sessions';
+const CURRENT_SESSION_KEY = 'prompt-matrix-current-session';
+const DEFAULT_SESSION_TITLE = '新对话';
 
-  // 当前会话
-  const currentSession = computed(() => {
-    if (!currentSessionId.value) return null;
-    return sessions.value.find(s => s.id === currentSessionId.value) || null;
-  });
+const sessions = ref<ChatSession[]>(loadSessionsFromStorage());
+const currentSessionId = ref<string | null>(
+  localStorage.getItem(CURRENT_SESSION_KEY) || null
+);
 
-  // 加载所有会话
-  function loadSessions(): ChatSession[] {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      return stored ? JSON.parse(stored) : [];
-    } catch (error) {
-      console.error('Failed to load chat sessions:', error);
-      return [];
-    }
-  }
+const currentSession = computed(() => {
+  if (!currentSessionId.value) return null;
+  return sessions.value.find((s) => s.id === currentSessionId.value) || null;
+});
 
-  // 保存所有会话
-  function saveSessions() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions.value));
-    } catch (error) {
-      console.error('Failed to save chat sessions:', error);
-    }
-  }
+ensureCurrentSessionConsistency();
 
-  // 保存当前会话ID
-  function saveCurrentSession() {
-    if (currentSessionId.value) {
-      localStorage.setItem(CURRENT_SESSION_KEY, currentSessionId.value);
-    } else {
-      localStorage.removeItem(CURRENT_SESSION_KEY);
-    }
-  }
-
-  // 创建新会话
-  function createSession(): ChatSession {
-    const session: ChatSession = {
-      id: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      title: '新对话',
-      messages: [],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-
-    sessions.value.unshift(session);
-    currentSessionId.value = session.id;
-    saveSessions();
-    saveCurrentSession();
-    
-    return session;
-  }
-
-  // 切换会话
-  function switchSession(sessionId: string) {
-    const session = sessions.value.find(s => s.id === sessionId);
-    if (session) {
-      currentSessionId.value = sessionId;
-      saveCurrentSession();
-      return session.messages;
-    }
+function loadSessionsFromStorage(): ChatSession[] {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch (error) {
+    console.error('Failed to load chat sessions:', error);
     return [];
   }
+}
 
-  // 更新会话消息
-  function updateSessionMessages(messages: ChatMessage[]) {
-    // 如果没有当前会话，创建一个新会话
-    if (!currentSessionId.value) {
-      // console.log('📝 没有当前会话，自动创建新会话');
-      createSession();
+function saveSessions() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions.value));
+  } catch (error) {
+    console.error('Failed to save chat sessions:', error);
+  }
+}
+
+function saveCurrentSession() {
+  if (currentSessionId.value) {
+    localStorage.setItem(CURRENT_SESSION_KEY, currentSessionId.value);
+  } else {
+    localStorage.removeItem(CURRENT_SESSION_KEY);
+  }
+}
+
+function ensureCurrentSessionConsistency() {
+  if (!currentSessionId.value) return;
+  const exists = sessions.value.some((s) => s.id === currentSessionId.value);
+  if (!exists) {
+    currentSessionId.value = sessions.value[0]?.id ?? null;
+    saveCurrentSession();
+  }
+}
+
+function createSession(): ChatSession {
+  const now = Date.now();
+  const session: ChatSession = {
+    id: `session_${now}_${Math.random().toString(36).slice(2, 11)}`,
+    title: DEFAULT_SESSION_TITLE,
+    messages: [],
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  sessions.value.unshift(session);
+  currentSessionId.value = session.id;
+  saveSessions();
+  saveCurrentSession();
+
+  return session;
+}
+
+function switchSession(sessionId: string) {
+  const session = sessions.value.find((s) => s.id === sessionId);
+  if (session) {
+    currentSessionId.value = sessionId;
+    saveCurrentSession();
+    return session.messages;
+  }
+  return [];
+}
+
+function updateSessionMessages(messages: ChatMessage[]) {
+  // Do not auto-create empty sessions when there is no active one.
+  if (!currentSessionId.value && messages.length === 0) {
+    return;
+  }
+
+  if (!currentSessionId.value) {
+    createSession();
+  }
+
+  let session = sessions.value.find((s) => s.id === currentSessionId.value);
+  if (!session) {
+    if (messages.length === 0) {
+      currentSessionId.value = null;
+      saveCurrentSession();
+      return;
     }
+    session = createSession();
+  }
 
-    const session = sessions.value.find(s => s.id === currentSessionId.value);
-    if (session) {
-      session.messages = messages;
-      session.updatedAt = Date.now();
-      
-      // 自动生成标题（使用第一条用户消息）
-      if (session.title === '新对话' && messages.length > 0) {
-        const firstUserMessage = messages.find(m => m.role === 'user');
-        if (firstUserMessage) {
-          session.title = firstUserMessage.content.slice(0, 30) + 
-            (firstUserMessage.content.length > 30 ? '...' : '');
-        }
-      }
-      
-      saveSessions();
-      // console.log('✅ 会话消息已更新:', session.title);
+  session.messages = [...messages];
+  session.updatedAt = Date.now();
+
+  if (session.title === DEFAULT_SESSION_TITLE && messages.length > 0) {
+    const firstUserMessage = messages.find((m) => m.role === 'user');
+    if (firstUserMessage) {
+      session.title =
+        firstUserMessage.content.slice(0, 30) +
+        (firstUserMessage.content.length > 30 ? '...' : '');
     }
   }
 
-  // 删除会话
-  function deleteSession(sessionId: string) {
-    const index = sessions.value.findIndex(s => s.id === sessionId);
-    if (index !== -1) {
-      sessions.value.splice(index, 1);
-      saveSessions();
-      
-      // 如果删除的是当前会话，切换到第一个会话或创建新会话
-      if (currentSessionId.value === sessionId) {
-        if (sessions.value.length > 0) {
-          currentSessionId.value = sessions.value[0].id;
-        } else {
-          currentSessionId.value = null;
-        }
-        saveCurrentSession();
-      }
-    }
+  saveSessions();
+}
+
+function deleteSession(sessionId: string): string | null {
+  const index = sessions.value.findIndex((s) => s.id === sessionId);
+  if (index === -1) return currentSessionId.value;
+
+  const isDeletingCurrent = currentSessionId.value === sessionId;
+  sessions.value.splice(index, 1);
+
+  if (isDeletingCurrent) {
+    currentSessionId.value = sessions.value[0]?.id ?? null;
   }
 
-  // 重命名会话
-  function renameSession(sessionId: string, newTitle: string) {
-    const session = sessions.value.find(s => s.id === sessionId);
-    if (session) {
-      session.title = newTitle;
-      session.updatedAt = Date.now();
-      saveSessions();
-    }
-  }
+  saveSessions();
+  saveCurrentSession();
+  return currentSessionId.value;
+}
 
-  
+function renameSession(sessionId: string, newTitle: string) {
+  const session = sessions.value.find((s) => s.id === sessionId);
+  if (session) {
+    session.title = newTitle;
+    session.updatedAt = Date.now();
+    saveSessions();
+  }
+}
+
+export function useChatHistory() {
   return {
     sessions,
     currentSession,
@@ -154,3 +166,4 @@ export function useChatHistory() {
     renameSession,
   };
 }
+
