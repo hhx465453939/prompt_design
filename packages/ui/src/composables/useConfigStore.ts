@@ -27,6 +27,10 @@ const defaultConfig: UserConfig = {
 
 type RuntimeEnv = Partial<Record<string, string>>;
 
+function hasText(value?: string): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
 function normalizeBaseURL(provider: UserConfig['provider'], baseURL?: string): string {
   const raw = (baseURL || '').trim();
   if (!raw) {
@@ -53,15 +57,24 @@ function getEnvConfig(): Partial<UserConfig> | null {
   const runtimeEnv = getRuntimeEnv();
   if (!runtimeEnv) return null;
 
-  const apiKey = runtimeEnv.VITE_DEEPSEEK_API_KEY;
-  if (!apiKey) return null;
+  const apiKey = runtimeEnv.VITE_DEEPSEEK_API_KEY?.trim();
+  const model = runtimeEnv.DEFAULT_EXPERT_MODEL?.trim();
+  const rawBaseURL = runtimeEnv.VITE_DEEPSEEK_BASE_URL?.trim();
+  if (!apiKey && !model && !rawBaseURL) return null;
 
-  return {
+  const envConfig: Partial<UserConfig> = {
     provider: 'deepseek',
-    apiKey,
-    model: runtimeEnv.DEFAULT_EXPERT_MODEL || 'deepseek-chat',
-    baseURL: normalizeBaseURL('deepseek', runtimeEnv.VITE_DEEPSEEK_BASE_URL),
+    model: model || 'deepseek-chat',
   };
+
+  if (apiKey) {
+    envConfig.apiKey = apiKey;
+  }
+  if (rawBaseURL) {
+    envConfig.baseURL = normalizeBaseURL('deepseek', rawBaseURL);
+  }
+
+  return envConfig;
 }
 
 function getStoredConfig(): Partial<UserConfig> | null {
@@ -115,10 +128,16 @@ function loadConfig(): UserConfig {
   const envConfig = getEnvConfig() || {};
   const storedConfig = getStoredConfig() || {};
 
+  const fallbackBaseURL =
+    hasText(storedConfig.baseURL) || !hasText(envConfig.baseURL)
+      ? storedConfig.baseURL
+      : envConfig.baseURL;
+
   const finalConfig: UserConfig = {
     ...defaultConfig,
     ...envConfig,
     ...storedConfig,
+    baseURL: fallbackBaseURL as string | undefined,
   };
   finalConfig.baseURL = normalizeBaseURL(finalConfig.provider, finalConfig.baseURL);
 

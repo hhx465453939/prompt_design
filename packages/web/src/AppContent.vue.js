@@ -1,7 +1,7 @@
 /// <reference types="../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import { ref, onMounted, watch } from 'vue';
 import { NModal, NSpace, NText, NAlert, useMessage, useDialog, } from 'naive-ui';
-import { ChatWindow, ConfigPanel, useChatStore, useConfigStore, useChatHistory } from '@prompt-matrix/ui';
+import { ChatWindow, ConfigPanel, FlowTimeline, useChatStore, useConfigStore, useChatHistory, useFlowRunner, } from '@prompt-matrix/ui';
 import { LLMService, RouterService } from '@prompt-matrix/core';
 // 导出/复制：取最后一条 AI 消息
 const exportMarkdown = () => {
@@ -34,23 +34,46 @@ const dialog = useDialog();
 // UI 状态
 const showConfig = ref(false);
 const showWelcome = ref(false);
+// Flow 状态机（前端多 Agent 编排）
+const flow = useFlowRunner();
+const flowRunning = ref(false);
+const flowSteps = flow.steps;
+const flowTemplates = flow.templates;
+const flowActiveTemplateId = flow.activeTemplateId;
 // 服务实例
 let llmService = null;
 let routerService = null;
 let customAgentsRegistered = false; // 添加标记防止重复注册
+let pendingCustomAgents = [];
+const normalizeCustomAgentId = (id) => {
+    return String(id || '').replace(/^CUSTOM_+/i, '').trim();
+};
+const normalizeCustomAgents = (agents) => {
+    const deduped = new Map();
+    agents.forEach((agent) => {
+        const normalizedId = normalizeCustomAgentId(agent.id);
+        if (!normalizedId)
+            return;
+        deduped.set(normalizedId, {
+            ...agent,
+            id: normalizedId,
+        });
+    });
+    return Array.from(deduped.values());
+};
 /**
  * 注册自定义Agent到RouterService
  */
 const registerCustomAgents = (agents) => {
+    const normalizedAgents = normalizeCustomAgents(agents);
+    pendingCustomAgents = normalizedAgents;
     if (!routerService || !llmService) {
-        console.warn('⚠️ 服务未初始化，无法注册自定义Agent');
         return;
     }
     try {
-        // 注册新的自定义Agent
-        agents.forEach(agent => {
+        normalizedAgents.forEach((agent) => {
             const agentConfig = {
-                id: agent.id, // 直接使用原始ID，不做前缀处理
+                id: agent.id,
                 name: agent.name,
                 prompt: agent.prompt,
                 expertise: agent.expertise,
@@ -58,8 +81,10 @@ const registerCustomAgents = (agents) => {
             routerService.registerCustomAgent(agentConfig);
             console.log(`✅ 注册自定义Agent: ${agent.name} (CUSTOM_${agent.id})`);
         });
-        // 标记为已注册
-        customAgentsRegistered = true;
+        customAgentsRegistered = normalizedAgents.length > 0;
+        if (normalizedAgents.length > 0) {
+            console.log(`✅ 已注册 ${normalizedAgents.length} 个自定义Agent`);
+        }
     }
     catch (error) {
         console.error('❌ 自定义Agent注册失败:', error);
@@ -99,26 +124,27 @@ const initializeServices = () => {
             configStore.saveConfig(updatedConfig);
         }
         llmService.initialize(coreConfig);
-        // 创建路由服务（只在第一次初始化时创建）
-        if (!routerService) {
-            routerService = new RouterService(llmService);
-        }
-        // 注册已保存的自定义Agent（只注册一次）
-        if (!customAgentsRegistered) {
+        // 每次初始化都重建 RouterService，确保使用最新 LLM 配置
+        routerService = new RouterService(llmService);
+        customAgentsRegistered = false;
+        // 优先使用缓存中的自定义 Agent（处理先触发 custom-agents-update 的情况）
+        let agentsToRegister = pendingCustomAgents;
+        if (agentsToRegister.length === 0) {
             const savedAgents = localStorage.getItem('custom-engineers');
             if (savedAgents) {
                 try {
-                    const agents = JSON.parse(savedAgents);
-                    if (agents.length > 0) {
-                        registerCustomAgents(agents);
-                        customAgentsRegistered = true;
-                        console.log(`✅ 已注册 ${agents.length} 个自定义Agent`);
+                    const parsed = JSON.parse(savedAgents);
+                    if (Array.isArray(parsed)) {
+                        agentsToRegister = parsed;
                     }
                 }
                 catch (error) {
                     console.error('❌ 加载自定义Agent失败:', error);
                 }
             }
+        }
+        if (agentsToRegister.length > 0) {
+            registerCustomAgents(agentsToRegister);
         }
         return true;
     }
@@ -205,6 +231,96 @@ const handleSend = async (text, selectedAgent) => {
     finally {
         chatStore.loading.value = false;
     }
+};
+/**
+ * 运行当前 Flow（线性多 Agent 串行执行）
+ */
+const runCurrentFlow = async () => {
+    if (flowRunning.value)
+        return;
+    const steps = flow.steps.value;
+    if (!steps.length)
+        return;
+    if (!routerService) {
+        const success = initializeServices();
+        if (!success)
+            return;
+    }
+    flowRunning.value = true;
+    let previousOutput = '';
+    try {
+        const lastUserMessage = [...chatStore.messages.value]
+            .reverse()
+            .find((m) => m.role === 'user' && m.content);
+        for (const step of steps) {
+            flow.updateStep(step.id, {
+                status: 'running',
+                errorMessage: undefined,
+            });
+            let inputText = '';
+            if (step.inputSource === 'user') {
+                if (lastUserMessage) {
+                    inputText = step.customInput
+                        ? `${step.customInput}\n\n=== 用户输入 ===\n${lastUserMessage.content}`
+                        : lastUserMessage.content;
+                }
+                else {
+                    inputText = step.customInput || '';
+                }
+            }
+            else if (step.inputSource === 'previousStep') {
+                if (previousOutput) {
+                    inputText = step.customInput
+                        ? `${step.customInput}\n\n=== 上一步输出 ===\n${previousOutput}`
+                        : previousOutput;
+                }
+                else if (lastUserMessage) {
+                    inputText = step.customInput
+                        ? `${step.customInput}\n\n=== 用户输入 ===\n${lastUserMessage.content}`
+                        : lastUserMessage.content;
+                }
+                else {
+                    inputText = step.customInput || '';
+                }
+            }
+            else {
+                inputText = step.customInput || '';
+            }
+            let accumulatedContent = '';
+            await routerService.handleRequestStream(inputText, (chunk) => {
+                accumulatedContent += chunk;
+                flow.updateStep(step.id, {
+                    outputFull: accumulatedContent,
+                    outputSummary: accumulatedContent.slice(0, 200),
+                });
+            }, undefined, {
+                metadata: {
+                    forcedAgent: step.agentType,
+                },
+            });
+            previousOutput = accumulatedContent;
+            flow.updateStep(step.id, {
+                status: 'success',
+            });
+        }
+    }
+    catch (error) {
+        const messageText = error.message || 'Flow execution failed';
+        const runningStep = steps.find((s) => s.status === 'running');
+        if (runningStep) {
+            flow.updateStep(runningStep.id, {
+                status: 'error',
+                errorMessage: messageText,
+            });
+        }
+        message.error('Flow 执行失败：' + messageText);
+    }
+    finally {
+        flowRunning.value = false;
+    }
+};
+const handleSelectFlowTemplate = (id) => {
+    flow.selectTemplate(id);
 };
 /**
  * 发送示例
@@ -338,7 +454,13 @@ const handleTestPrompt = (prompt) => {
  * 处理自定义Agent更新
  */
 const handleCustomAgentsUpdate = (agents) => {
-    registerCustomAgents(agents);
+    pendingCustomAgents = normalizeCustomAgents(agents);
+    // 服务已就绪时，重建一次 Router 以同步自定义 Agent 的增删改
+    if (llmService && routerService) {
+        initializeServices();
+        return;
+    }
+    registerCustomAgents(pendingCustomAgents);
 };
 /**
  * 处理删除消息
@@ -472,170 +594,205 @@ let __VLS_directives;
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "app-content" },
 });
-const __VLS_0 = {}.ChatWindow;
-/** @type {[typeof __VLS_components.ChatWindow, ]} */ ;
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "app-main" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "app-flow-wrapper" },
+});
+const __VLS_0 = {}.FlowTimeline;
+/** @type {[typeof __VLS_components.FlowTimeline, ]} */ ;
 // @ts-ignore
 const __VLS_1 = __VLS_asFunctionalComponent(__VLS_0, new __VLS_0({
-    ...{ 'onSend': {} },
-    ...{ 'onSendExample': {} },
-    ...{ 'onOpenSettings': {} },
-    ...{ 'onExportMd': {} },
-    ...{ 'onCopyMd': {} },
-    ...{ 'onLoadSession': {} },
-    ...{ 'onCopyMessage': {} },
-    ...{ 'onFreeChat': {} },
-    ...{ 'onTestPrompt': {} },
-    ...{ 'onUpdateLoading': {} },
-    ...{ 'onRegenerate': {} },
-    ...{ 'onCustomAgentsUpdate': {} },
-    ...{ 'onDeleteMessage': {} },
-    messages: (__VLS_ctx.chatStore.messages.value),
-    loading: (__VLS_ctx.chatStore.loading.value),
-    isConfigured: (__VLS_ctx.configStore.isConfigured.value),
+    ...{ 'onSelectTemplate': {} },
+    ...{ 'onRunFlow': {} },
+    steps: (__VLS_ctx.flowSteps),
+    templates: (__VLS_ctx.flowTemplates),
+    activeTemplateId: (__VLS_ctx.flowActiveTemplateId),
+    running: (__VLS_ctx.flowRunning),
 }));
 const __VLS_2 = __VLS_1({
-    ...{ 'onSend': {} },
-    ...{ 'onSendExample': {} },
-    ...{ 'onOpenSettings': {} },
-    ...{ 'onExportMd': {} },
-    ...{ 'onCopyMd': {} },
-    ...{ 'onLoadSession': {} },
-    ...{ 'onCopyMessage': {} },
-    ...{ 'onFreeChat': {} },
-    ...{ 'onTestPrompt': {} },
-    ...{ 'onUpdateLoading': {} },
-    ...{ 'onRegenerate': {} },
-    ...{ 'onCustomAgentsUpdate': {} },
-    ...{ 'onDeleteMessage': {} },
-    messages: (__VLS_ctx.chatStore.messages.value),
-    loading: (__VLS_ctx.chatStore.loading.value),
-    isConfigured: (__VLS_ctx.configStore.isConfigured.value),
+    ...{ 'onSelectTemplate': {} },
+    ...{ 'onRunFlow': {} },
+    steps: (__VLS_ctx.flowSteps),
+    templates: (__VLS_ctx.flowTemplates),
+    activeTemplateId: (__VLS_ctx.flowActiveTemplateId),
+    running: (__VLS_ctx.flowRunning),
 }, ...__VLS_functionalComponentArgsRest(__VLS_1));
 let __VLS_4;
 let __VLS_5;
 let __VLS_6;
 const __VLS_7 = {
-    onSend: (__VLS_ctx.handleSend)
+    onSelectTemplate: (__VLS_ctx.handleSelectFlowTemplate)
 };
 const __VLS_8 = {
+    onRunFlow: (__VLS_ctx.runCurrentFlow)
+};
+var __VLS_3;
+const __VLS_9 = {}.ChatWindow;
+/** @type {[typeof __VLS_components.ChatWindow, ]} */ ;
+// @ts-ignore
+const __VLS_10 = __VLS_asFunctionalComponent(__VLS_9, new __VLS_9({
+    ...{ 'onSend': {} },
+    ...{ 'onSendExample': {} },
+    ...{ 'onOpenSettings': {} },
+    ...{ 'onExportMd': {} },
+    ...{ 'onCopyMd': {} },
+    ...{ 'onLoadSession': {} },
+    ...{ 'onCopyMessage': {} },
+    ...{ 'onFreeChat': {} },
+    ...{ 'onTestPrompt': {} },
+    ...{ 'onUpdateLoading': {} },
+    ...{ 'onRegenerate': {} },
+    ...{ 'onCustomAgentsUpdate': {} },
+    ...{ 'onDeleteMessage': {} },
+    messages: (__VLS_ctx.chatStore.messages.value),
+    loading: (__VLS_ctx.chatStore.loading.value),
+    isConfigured: (__VLS_ctx.configStore.isConfigured.value),
+}));
+const __VLS_11 = __VLS_10({
+    ...{ 'onSend': {} },
+    ...{ 'onSendExample': {} },
+    ...{ 'onOpenSettings': {} },
+    ...{ 'onExportMd': {} },
+    ...{ 'onCopyMd': {} },
+    ...{ 'onLoadSession': {} },
+    ...{ 'onCopyMessage': {} },
+    ...{ 'onFreeChat': {} },
+    ...{ 'onTestPrompt': {} },
+    ...{ 'onUpdateLoading': {} },
+    ...{ 'onRegenerate': {} },
+    ...{ 'onCustomAgentsUpdate': {} },
+    ...{ 'onDeleteMessage': {} },
+    messages: (__VLS_ctx.chatStore.messages.value),
+    loading: (__VLS_ctx.chatStore.loading.value),
+    isConfigured: (__VLS_ctx.configStore.isConfigured.value),
+}, ...__VLS_functionalComponentArgsRest(__VLS_10));
+let __VLS_13;
+let __VLS_14;
+let __VLS_15;
+const __VLS_16 = {
+    onSend: (__VLS_ctx.handleSend)
+};
+const __VLS_17 = {
     onSendExample: (__VLS_ctx.handleSendExample)
 };
-const __VLS_9 = {
+const __VLS_18 = {
     onOpenSettings: (...[$event]) => {
         __VLS_ctx.showConfig = true;
     }
 };
-const __VLS_10 = {
+const __VLS_19 = {
     onExportMd: (...[$event]) => {
         __VLS_ctx.exportMarkdown();
     }
 };
-const __VLS_11 = {
+const __VLS_20 = {
     onCopyMd: (...[$event]) => {
         __VLS_ctx.copyMarkdown();
     }
 };
-const __VLS_12 = {
+const __VLS_21 = {
     onLoadSession: (__VLS_ctx.handleLoadSession)
 };
-const __VLS_13 = {
+const __VLS_22 = {
     onCopyMessage: (__VLS_ctx.handleCopyMessage)
 };
-const __VLS_14 = {
+const __VLS_23 = {
     onFreeChat: (__VLS_ctx.handleFreeChat)
 };
-const __VLS_15 = {
+const __VLS_24 = {
     onTestPrompt: (__VLS_ctx.handleTestPrompt)
 };
-const __VLS_16 = {
+const __VLS_25 = {
     onUpdateLoading: (...[$event]) => {
         __VLS_ctx.chatStore.loading.value = $event;
     }
 };
-const __VLS_17 = {
+const __VLS_26 = {
     onRegenerate: (__VLS_ctx.handleRegenerate)
 };
-const __VLS_18 = {
+const __VLS_27 = {
     onCustomAgentsUpdate: (__VLS_ctx.handleCustomAgentsUpdate)
 };
-const __VLS_19 = {
+const __VLS_28 = {
     onDeleteMessage: (__VLS_ctx.handleDeleteMessage)
 };
-var __VLS_3;
-const __VLS_20 = {}.ConfigPanel;
+var __VLS_12;
+const __VLS_29 = {}.ConfigPanel;
 /** @type {[typeof __VLS_components.ConfigPanel, ]} */ ;
 // @ts-ignore
-const __VLS_21 = __VLS_asFunctionalComponent(__VLS_20, new __VLS_20({
+const __VLS_30 = __VLS_asFunctionalComponent(__VLS_29, new __VLS_29({
     ...{ 'onSave': {} },
     show: (__VLS_ctx.showConfig),
     config: (__VLS_ctx.configStore.config.value),
 }));
-const __VLS_22 = __VLS_21({
+const __VLS_31 = __VLS_30({
     ...{ 'onSave': {} },
     show: (__VLS_ctx.showConfig),
     config: (__VLS_ctx.configStore.config.value),
-}, ...__VLS_functionalComponentArgsRest(__VLS_21));
-let __VLS_24;
-let __VLS_25;
-let __VLS_26;
-const __VLS_27 = {
-    onSave: (__VLS_ctx.handleSaveConfig)
-};
-var __VLS_23;
-const __VLS_28 = {}.NModal;
-/** @type {[typeof __VLS_components.NModal, typeof __VLS_components.nModal, typeof __VLS_components.NModal, typeof __VLS_components.nModal, ]} */ ;
-// @ts-ignore
-const __VLS_29 = __VLS_asFunctionalComponent(__VLS_28, new __VLS_28({
-    ...{ 'onPositiveClick': {} },
-    show: (__VLS_ctx.showWelcome),
-    preset: "dialog",
-    title: "👋 欢迎使用智能提示词工程师系统",
-    positiveText: "开始使用",
-}));
-const __VLS_30 = __VLS_29({
-    ...{ 'onPositiveClick': {} },
-    show: (__VLS_ctx.showWelcome),
-    preset: "dialog",
-    title: "👋 欢迎使用智能提示词工程师系统",
-    positiveText: "开始使用",
-}, ...__VLS_functionalComponentArgsRest(__VLS_29));
-let __VLS_32;
+}, ...__VLS_functionalComponentArgsRest(__VLS_30));
 let __VLS_33;
 let __VLS_34;
-const __VLS_35 = {
+let __VLS_35;
+const __VLS_36 = {
+    onSave: (__VLS_ctx.handleSaveConfig)
+};
+var __VLS_32;
+const __VLS_37 = {}.NModal;
+/** @type {[typeof __VLS_components.NModal, typeof __VLS_components.nModal, typeof __VLS_components.NModal, typeof __VLS_components.nModal, ]} */ ;
+// @ts-ignore
+const __VLS_38 = __VLS_asFunctionalComponent(__VLS_37, new __VLS_37({
+    ...{ 'onPositiveClick': {} },
+    show: (__VLS_ctx.showWelcome),
+    preset: "dialog",
+    title: "👋 欢迎使用智能提示词工程师系统",
+    positiveText: "开始使用",
+}));
+const __VLS_39 = __VLS_38({
+    ...{ 'onPositiveClick': {} },
+    show: (__VLS_ctx.showWelcome),
+    preset: "dialog",
+    title: "👋 欢迎使用智能提示词工程师系统",
+    positiveText: "开始使用",
+}, ...__VLS_functionalComponentArgsRest(__VLS_38));
+let __VLS_41;
+let __VLS_42;
+let __VLS_43;
+const __VLS_44 = {
     onPositiveClick: (...[$event]) => {
         __VLS_ctx.showWelcome = false;
     }
 };
-__VLS_31.slots.default;
-const __VLS_36 = {}.NSpace;
+__VLS_40.slots.default;
+const __VLS_45 = {}.NSpace;
 /** @type {[typeof __VLS_components.NSpace, typeof __VLS_components.nSpace, typeof __VLS_components.NSpace, typeof __VLS_components.nSpace, ]} */ ;
 // @ts-ignore
-const __VLS_37 = __VLS_asFunctionalComponent(__VLS_36, new __VLS_36({
+const __VLS_46 = __VLS_asFunctionalComponent(__VLS_45, new __VLS_45({
     vertical: true,
 }));
-const __VLS_38 = __VLS_37({
+const __VLS_47 = __VLS_46({
     vertical: true,
-}, ...__VLS_functionalComponentArgsRest(__VLS_37));
-__VLS_39.slots.default;
-const __VLS_40 = {}.NText;
+}, ...__VLS_functionalComponentArgsRest(__VLS_46));
+__VLS_48.slots.default;
+const __VLS_49 = {}.NText;
 /** @type {[typeof __VLS_components.NText, typeof __VLS_components.nText, typeof __VLS_components.NText, typeof __VLS_components.nText, ]} */ ;
 // @ts-ignore
-const __VLS_41 = __VLS_asFunctionalComponent(__VLS_40, new __VLS_40({}));
-const __VLS_42 = __VLS_41({}, ...__VLS_functionalComponentArgsRest(__VLS_41));
-__VLS_43.slots.default;
-var __VLS_43;
-const __VLS_44 = {}.NText;
+const __VLS_50 = __VLS_asFunctionalComponent(__VLS_49, new __VLS_49({}));
+const __VLS_51 = __VLS_50({}, ...__VLS_functionalComponentArgsRest(__VLS_50));
+__VLS_52.slots.default;
+var __VLS_52;
+const __VLS_53 = {}.NText;
 /** @type {[typeof __VLS_components.NText, typeof __VLS_components.nText, typeof __VLS_components.NText, typeof __VLS_components.nText, ]} */ ;
 // @ts-ignore
-const __VLS_45 = __VLS_asFunctionalComponent(__VLS_44, new __VLS_44({
+const __VLS_54 = __VLS_asFunctionalComponent(__VLS_53, new __VLS_53({
     depth: "3",
 }));
-const __VLS_46 = __VLS_45({
+const __VLS_55 = __VLS_54({
     depth: "3",
-}, ...__VLS_functionalComponentArgsRest(__VLS_45));
-__VLS_47.slots.default;
-var __VLS_47;
+}, ...__VLS_functionalComponentArgsRest(__VLS_54));
+__VLS_56.slots.default;
+var __VLS_56;
 __VLS_asFunctionalElement(__VLS_intrinsicElements.ul, __VLS_intrinsicElements.ul)({
     ...{ style: {} },
 });
@@ -645,23 +802,25 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.li, __VLS_intrinsicElements.li
 __VLS_asFunctionalElement(__VLS_intrinsicElements.li, __VLS_intrinsicElements.li)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.li, __VLS_intrinsicElements.li)({});
 if (!__VLS_ctx.configStore.isConfigured.value) {
-    const __VLS_48 = {}.NAlert;
+    const __VLS_57 = {}.NAlert;
     /** @type {[typeof __VLS_components.NAlert, typeof __VLS_components.nAlert, typeof __VLS_components.NAlert, typeof __VLS_components.nAlert, ]} */ ;
     // @ts-ignore
-    const __VLS_49 = __VLS_asFunctionalComponent(__VLS_48, new __VLS_48({
+    const __VLS_58 = __VLS_asFunctionalComponent(__VLS_57, new __VLS_57({
         type: "warning",
         title: "温馨提示",
     }));
-    const __VLS_50 = __VLS_49({
+    const __VLS_59 = __VLS_58({
         type: "warning",
         title: "温馨提示",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_49));
-    __VLS_51.slots.default;
-    var __VLS_51;
+    }, ...__VLS_functionalComponentArgsRest(__VLS_58));
+    __VLS_60.slots.default;
+    var __VLS_60;
 }
-var __VLS_39;
-var __VLS_31;
+var __VLS_48;
+var __VLS_40;
 /** @type {__VLS_StyleScopedClasses['app-content']} */ ;
+/** @type {__VLS_StyleScopedClasses['app-main']} */ ;
+/** @type {__VLS_StyleScopedClasses['app-flow-wrapper']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
@@ -672,13 +831,20 @@ const __VLS_self = (await import('vue')).defineComponent({
             NAlert: NAlert,
             ChatWindow: ChatWindow,
             ConfigPanel: ConfigPanel,
+            FlowTimeline: FlowTimeline,
             exportMarkdown: exportMarkdown,
             copyMarkdown: copyMarkdown,
             chatStore: chatStore,
             configStore: configStore,
             showConfig: showConfig,
             showWelcome: showWelcome,
+            flowRunning: flowRunning,
+            flowSteps: flowSteps,
+            flowTemplates: flowTemplates,
+            flowActiveTemplateId: flowActiveTemplateId,
             handleSend: handleSend,
+            runCurrentFlow: runCurrentFlow,
+            handleSelectFlowTemplate: handleSelectFlowTemplate,
             handleSendExample: handleSendExample,
             handleSaveConfig: handleSaveConfig,
             handleLoadSession: handleLoadSession,

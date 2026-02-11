@@ -6,6 +6,12 @@ This project is a monorepo. The Web app reads runtime env from the workspace roo
 
 Configure model provider once, then make sure requests go to the expected endpoint.
 
+## What Changed (2026-02-11)
+
+- Runtime env now supports loading `VITE_DEEPSEEK_BASE_URL` even when `VITE_DEEPSEEK_API_KEY` is not set.
+- In settings, when switching provider to `DeepSeek`, default Base URL now prefers `.env.local` value first.
+- Chat message IDs are now auto-sanitized to prevent duplicate-key warnings in Vue (`TransitionGroup`).
+
 ## Prerequisites
 
 - Node.js and pnpm installed
@@ -53,6 +59,13 @@ If you previously saved wrong settings in UI, they override `.env.local`.
   1. Open UI Settings and set `Base URL` explicitly, then save.
   2. If still wrong, clear local storage key `prompt-matrix-config` and refresh.
   3. Restart `pnpm dev` after editing `.env.local`.
+
+### I only configured `VITE_DEEPSEEK_BASE_URL`, not `VITE_DEEPSEEK_API_KEY`
+
+- This is now supported for endpoint bootstrap.
+- But requests still require a valid API key:
+  1. Fill key in UI settings, or
+  2. Add `VITE_DEEPSEEK_API_KEY` into `.env.local`.
 
 ### API key invalid
 

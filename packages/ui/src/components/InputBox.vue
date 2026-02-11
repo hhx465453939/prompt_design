@@ -10,6 +10,7 @@
     />
     <div class="input-actions">
       <n-button
+        class="send-btn"
         type="primary"
         :loading="loading"
         :disabled="disabled || !inputValue.trim()"
@@ -18,10 +19,10 @@
         <template #icon>
           <n-icon><SendOutline /></n-icon>
         </template>
-        发送
+        Send
       </n-button>
-    <n-button quaternary style="margin-left:8px" @click="emit('export-md')">导出 Markdown</n-button>
-    <n-button quaternary style="margin-left:4px" @click="emit('copy-md')">复制 Markdown</n-button>
+      <n-button class="tool-btn" quaternary @click="emit('export-md')">Export Markdown</n-button>
+      <n-button class="tool-btn" quaternary @click="emit('copy-md')">Copy Markdown</n-button>
     </div>
   </div>
 </template>
@@ -49,7 +50,7 @@ const props = withDefaults(defineProps<Props>(), {
   modelValue: '',
   loading: false,
   disabled: false,
-  placeholder: '输入你的需求，让 AI Agent 帮你生成提示词...',
+  placeholder: 'Describe what you need and let an AI agent help you build the prompt...',
 });
 
 const emit = defineEmits<Emits>();
@@ -69,51 +70,92 @@ const handleSend = () => {
 <style scoped>
 .input-box {
   display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  padding: 16px;
-  background: #f8f9fa;
-  border-radius: 12px;
-  border: 2px solid #e8e8e8;
-  transition: all 0.3s ease;
+  align-items: stretch;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 16px;
+  border: 1px solid var(--pm-line-soft);
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: var(--pm-shadow-sm);
+  position: relative;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .input-box:focus-within {
-  border-color: #667eea;
-  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+  border-color: rgba(14, 148, 137, 0.44);
+  box-shadow: 0 0 0 4px rgba(14, 148, 137, 0.14), var(--pm-shadow-md);
+  transform: translateY(-1px);
 }
 
 .input-box :deep(.n-input) {
   flex: 1;
+  min-width: 0;
+}
+
+.input-box :deep(.n-input__border),
+.input-box :deep(.n-input__state-border) {
+  display: none;
+}
+
+.input-box :deep(.n-input-wrapper) {
+  background: transparent;
+  padding: 6px 2px;
 }
 
 .input-box :deep(.n-input__textarea-el) {
-  font-size: 15px;
-  line-height: 1.6;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--pm-ink-900);
 }
 
 .input-actions {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
-.input-actions :deep(.n-button) {
+.send-btn {
   height: 40px;
-  padding: 0 24px;
-  font-size: 15px;
-  font-weight: 600;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  transition: all 0.3s ease;
+  min-width: 108px;
+  border-radius: 11px;
+  font-weight: 620;
+  background: linear-gradient(130deg, #119c91 0%, #0d7d74 100%);
+  border: 1px solid rgba(12, 96, 89, 0.28);
+  box-shadow: 0 10px 24px rgba(10, 92, 84, 0.24);
 }
 
-.input-actions :deep(.n-button:hover) {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+.send-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 26px rgba(10, 92, 84, 0.3);
 }
 
-.input-actions :deep(.n-button:active) {
-  transform: translateY(0);
+.tool-btn {
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--pm-line-soft);
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--pm-ink-700);
+  font-size: 12px;
+}
+
+.tool-btn:hover {
+  border-color: rgba(14, 148, 137, 0.32);
+  color: #0d7d74;
+}
+
+@media (max-width: 760px) {
+  .input-box {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .input-actions {
+    justify-content: flex-end;
+  }
+
+  .send-btn {
+    min-width: 96px;
+  }
 }
 </style>
-

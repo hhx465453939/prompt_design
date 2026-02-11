@@ -11,6 +11,7 @@ export { default as ConfigPanel } from './components/ConfigPanel.vue';
 export { default as AgentIndicator } from './components/AgentIndicator.vue';
 export { default as CustomProviderManager } from './components/CustomProviderManager.vue';
 export { default as ChatSidebar } from './components/ChatSidebar.vue';
+export { default as FlowTimeline } from './components/FlowTimeline.vue';
 
 // 类型导出
 export * from './types';
@@ -19,4 +20,5 @@ export * from './types';
 export { useChatStore } from './composables/useChatStore';
 export { useConfigStore } from './composables/useConfigStore';
 export { useChatHistory } from './composables/useChatHistory';
+export { useFlowRunner } from './composables/useFlowRunner';
 

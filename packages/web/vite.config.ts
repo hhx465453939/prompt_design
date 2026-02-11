@@ -23,7 +23,10 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ['vue', 'naive-ui', '@prompt-matrix/core', '@prompt-matrix/ui'],
+    include: ['vue', 'naive-ui'],
+    // Workspace packages are rebuilt frequently during local development.
+    // Excluding them avoids stale prebundle cache causing missing export errors.
+    exclude: ['@prompt-matrix/core', '@prompt-matrix/ui'],
   },
 });
 

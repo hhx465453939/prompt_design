@@ -10,7 +10,6 @@
     </div>
 
     <div class="message-content">
-      <!-- 消息头部 -->
       <div class="message-header">
         <span class="message-sender">{{ senderName }}</span>
         <AgentIndicator
@@ -18,117 +17,92 @@
           :agent-type="message.agentType"
           :intent="message.intent"
         />
-        <span class="message-time">
-          {{ formatTime(message.timestamp) }}
-        </span>
+        <span class="message-time">{{ formatTime(message.timestamp) }}</span>
       </div>
 
-      <!-- 消息主体 -->
       <div class="message-body">
         <template v-if="message.streaming">
           <div v-if="message.thinkingProcess" class="thinking-block">
-            <div class="thinking-title">思考过程</div>
+            <div class="thinking-title">Thinking process</div>
             <div class="thinking-content" v-html="renderMarkdown(message.thinkingProcess)" />
           </div>
           <div v-if="message.content" class="message-text" v-html="renderMarkdown(message.content)" />
         </template>
-        <n-alert
-          v-else-if="message.isError"
-          type="error"
-          :title="'错误'"
-        >
+        <n-alert v-else-if="message.isError" type="error" :title="'Error'">
           {{ currentContent }}
         </n-alert>
-        <div v-else-if="message.streaming" class="message-text" v-html="renderMarkdown(message.content)" />
         <div v-else class="message-text" v-html="renderMarkdown(currentContent)" />
       </div>
 
-      <!-- 消息底部元信息 -->
       <div class="message-footer">
         <div class="message-meta">
           <n-tag v-if="message.tokensUsed" size="tiny" :bordered="false">
-            📊 {{ message.tokensUsed }} tokens
+            {{ message.tokensUsed }} tokens
           </n-tag>
         </div>
         <div class="message-actions">
-          <!-- 只有助手消息才有额外功能 -->
           <template v-if="message.role === 'assistant'">
-            <!-- 历史回复切换 -->
             <div v-if="message.alternatives && message.alternatives.length > 0" class="history-navigation">
-              <n-button 
-                quaternary 
-                size="tiny" 
+              <n-button
+                quaternary
+                size="tiny"
                 @click="handlePreviousAlternative"
                 :disabled="currentAlternativeIndex === 0"
-                title="上一个回复"
+                title="Previous answer"
               >
                 <template #icon>
                   <n-icon><ChevronBackOutline /></n-icon>
                 </template>
               </n-button>
               <span class="alternative-counter">{{ currentAlternativeIndex + 1 }} / {{ message.alternatives.length + 1 }}</span>
-              <n-button 
-                quaternary 
-                size="tiny" 
+              <n-button
+                quaternary
+                size="tiny"
                 @click="handleNextAlternative"
                 :disabled="currentAlternativeIndex === message.alternatives.length"
-                title="下一个回复"
+                title="Next answer"
               >
                 <template #icon>
                   <n-icon><ChevronForwardOutline /></n-icon>
                 </template>
               </n-button>
             </div>
-            
-            <!-- 重新生成按钮 -->
+
             <n-button
               quaternary
               size="tiny"
               circle
               @click="handleRegenerateAction"
-              title="重新生成回复"
+              title="Regenerate answer"
               :loading="isRegenerating"
             >
               <template #icon>
                 <n-icon><RefreshOutline /></n-icon>
               </template>
             </n-button>
-            
-            <!-- 测试按钮 -->
+
             <n-button
               quaternary
               size="tiny"
               circle
-              @click="handleTestAction"
-              title="在自由聊天中测试此提示词"
+              @click="emit('test', message)"
+              title="Test this prompt in free chat"
             >
               <template #icon>
                 <n-icon><FlaskOutline /></n-icon>
               </template>
             </n-button>
           </template>
-          
-          <!-- 复制按钮 -->
-          <n-dropdown
-            :options="copyOptions"
-            placement="bottom-end"
-            @select="handleCopyAction"
-          >
+
+          <n-dropdown :options="copyOptions" placement="bottom-end" @select="handleCopyAction">
             <n-button quaternary size="tiny" circle>
               <template #icon>
                 <n-icon><CopyOutline /></n-icon>
               </template>
             </n-button>
           </n-dropdown>
-          
-          <!-- 删除按钮 -->
-          <n-button
-            quaternary
-            size="tiny"
-            circle
-            @click="handleDeleteAction"
-            title="删除此消息"
-          >
+
+          <n-button quaternary size="tiny" circle @click="emit('delete', message)" title="Delete message">
             <template #icon>
               <n-icon><TrashOutline /></n-icon>
             </template>
@@ -140,9 +114,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { NAvatar, NIcon, NSpin, NAlert, NTag, NButton, NDropdown } from 'naive-ui';
-import { PersonOutline, CopyOutline, FlaskOutline, RefreshOutline, ChevronBackOutline, ChevronForwardOutline, TrashOutline } from '@vicons/ionicons5';
+import { ref, computed, watch } from 'vue';
+import { NAvatar, NIcon, NAlert, NTag, NButton, NDropdown } from 'naive-ui';
+import {
+  PersonOutline,
+  CopyOutline,
+  FlaskOutline,
+  RefreshOutline,
+  ChevronBackOutline,
+  ChevronForwardOutline,
+  TrashOutline,
+} from '@vicons/ionicons5';
 import { marked } from 'marked';
 import AgentIndicator from './AgentIndicator.vue';
 import type { ChatMessage } from '../types';
@@ -162,11 +144,18 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-// 历史回复相关状态
 const currentAlternativeIndex = ref(0);
 const isRegenerating = ref(false);
 
-// 当前显示的内容
+watch(
+  () => props.message.streaming,
+  (streaming) => {
+    if (!streaming) {
+      isRegenerating.value = false;
+    }
+  }
+);
+
 const currentContent = computed(() => {
   if (currentAlternativeIndex.value === 0) {
     return props.message.content;
@@ -174,45 +163,40 @@ const currentContent = computed(() => {
   return props.message.alternatives?.[currentAlternativeIndex.value - 1]?.content || '';
 });
 
-// 处理上一个回复
 const handlePreviousAlternative = () => {
   if (currentAlternativeIndex.value > 0) {
-    currentAlternativeIndex.value--;
+    currentAlternativeIndex.value -= 1;
   }
 };
 
-// 处理下一个回复
 const handleNextAlternative = () => {
-  if (props.message.alternatives && currentAlternativeIndex.value < props.message.alternatives.length) {
-    currentAlternativeIndex.value++;
+  if (!props.message.alternatives) return;
+  if (currentAlternativeIndex.value < props.message.alternatives.length) {
+    currentAlternativeIndex.value += 1;
   }
 };
 
-// 处理重新生成
 const handleRegenerateAction = () => {
   isRegenerating.value = true;
   emit('regenerate', props.message);
 };
 
-// Agent 映射
 const agentMap: Record<AgentType, { name: string; icon: string; color: string }> = {
-  CONDUCTOR: { name: '指挥官', icon: '🎯', color: '#18a058' },
-  X0_OPTIMIZER: { name: 'X0优化师', icon: '⚡', color: '#2080f0' },
-  X0_REVERSE: { name: 'X0逆向', icon: '🔍', color: '#f0a020' },
-  X1_BASIC: { name: 'X1基础', icon: '📝', color: '#9c27b0' },
-  X4_SCENARIO: { name: 'X4场景', icon: '🎨', color: '#f06292' },
+  CONDUCTOR: { name: 'Conductor', icon: '🎯', color: '#18a058' },
+  X0_OPTIMIZER: { name: 'X0 Optimizer', icon: '⚡', color: '#2080f0' },
+  X0_REVERSE: { name: 'X0 Reverse', icon: '🔍', color: '#f0a020' },
+  X1_BASIC: { name: 'X1 Basic', icon: '🧩', color: '#7d56f4' },
+  X4_SCENARIO: { name: 'X4 Scenario', icon: '🎨', color: '#f06292' },
 };
 
-// 发送者名称
 const senderName = computed(() => {
-  if (props.message.role === 'user') return '你';
+  if (props.message.role === 'user') return 'You';
   if (props.message.agentType) {
-    return agentMap[props.message.agentType]?.name || 'AI助手';
+    return agentMap[props.message.agentType]?.name || 'Assistant';
   }
-  return 'AI助手';
+  return 'Assistant';
 });
 
-// Agent 图标
 const agentIcon = computed(() => {
   if (props.message.agentType) {
     return agentMap[props.message.agentType]?.icon || '🤖';
@@ -220,7 +204,6 @@ const agentIcon = computed(() => {
   return '🤖';
 });
 
-// Agent 颜色
 const agentColor = computed(() => {
   if (props.message.agentType) {
     return agentMap[props.message.agentType]?.color || '#18a058';
@@ -228,65 +211,43 @@ const agentColor = computed(() => {
   return '#18a058';
 });
 
-// 格式化时间
 const formatTime = (timestamp?: number) => {
   if (!timestamp) return '';
-  const date = new Date(timestamp);
-  return date.toLocaleTimeString('zh-CN', {
+  return new Date(timestamp).toLocaleTimeString('zh-CN', {
     hour: '2-digit',
     minute: '2-digit',
   });
 };
 
-// 渲染 Markdown
 const renderMarkdown = (content: string) => {
-  return marked(content, {
+  return marked(content || '', {
     breaks: true,
     gfm: true,
   });
 };
 
-// 复制选项
 const copyOptions = computed(() => {
-  const options = [
-    {
-      label: '复制 Markdown',
-      key: 'markdown',
-    },
-  ];
-
-  // 如果是助手消息且有思考过程，添加包含思考的选项
+  const options = [{ label: 'Copy Markdown', key: 'markdown' }];
   if (props.message.role === 'assistant' && props.message.thinkingProcess) {
     options.push({
-      label: '复制 Markdown（包含思考）',
+      label: 'Copy Markdown (with thinking)',
       key: 'markdown-with-thinking',
     });
   }
-
   return options;
 });
 
-// 处理复制操作
 const handleCopyAction = (key: string) => {
   emit('copy', props.message, key);
-};
-
-// 处理测试操作
-const handleTestAction = () => {
-  emit('test', props.message);
-};
-
-const handleDeleteAction = () => {
-  emit('delete', props.message);
 };
 </script>
 
 <style scoped>
 .message-item {
   display: flex;
-  gap: 16px;
-  margin-bottom: 28px;
-  animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  gap: 12px;
+  margin-bottom: 22px;
+  animation: fadeIn 0.28s cubic-bezier(0.2, 0.9, 0.2, 1);
 }
 
 .message-user {
@@ -298,13 +259,14 @@ const handleDeleteAction = () => {
 }
 
 .message-avatar :deep(.n-avatar) {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 22px rgba(8, 52, 56, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
 .message-content {
   flex: 1;
   min-width: 0;
-  max-width: 80%;
+  max-width: min(86%, 920px);
 }
 
 .message-user .message-content {
@@ -316,58 +278,66 @@ const handleDeleteAction = () => {
 .message-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 .message-sender {
-  font-size: 14px;
-  font-weight: 600;
-  color: #2c3e50;
+  font-size: 13px;
+  font-weight: 620;
+  color: var(--pm-ink-700);
+  letter-spacing: 0.02em;
 }
 
 .message-time {
-  font-size: 12px;
-  color: #95a5a6;
+  font-size: 11px;
+  color: var(--pm-ink-500);
   margin-left: auto;
 }
 
+.message-user .message-time {
+  margin-left: 0;
+  margin-right: auto;
+}
+
 .message-body {
-  padding: 16px 20px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  border: 1px solid #e8e8e8;
-  transition: all 0.2s ease;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.88);
+  border-radius: 16px;
+  box-shadow: var(--pm-shadow-sm);
+  border: 1px solid var(--pm-line-soft);
+  transition: transform 0.18s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .message-body:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--pm-shadow-md);
   transform: translateY(-1px);
+  border-color: rgba(14, 148, 137, 0.24);
 }
 
 .message-user .message-body {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
+  background: linear-gradient(136deg, #ea8f45 0%, #d4712d 100%);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 12px 24px rgba(161, 91, 34, 0.24);
 }
 
 .message-text {
-  font-size: 15px;
-  line-height: 1.7;
+  font-size: 14px;
+  line-height: 1.72;
   word-break: break-word;
-  color: #2c3e50;
+  color: var(--pm-ink-900);
 }
 
 .message-user .message-text {
-  color: white;
+  color: #fff;
 }
 
 .message-text :deep(h1),
 .message-text :deep(h2),
 .message-text :deep(h3) {
-  margin: 16px 0 12px;
-  font-weight: 600;
+  margin: 14px 0 10px;
+  font-weight: 650;
   color: inherit;
 }
 
@@ -377,8 +347,8 @@ const handleDeleteAction = () => {
 
 .message-text :deep(ul),
 .message-text :deep(ol) {
-  margin: 12px 0;
-  padding-left: 24px;
+  margin: 10px 0;
+  padding-left: 22px;
 }
 
 .message-text :deep(li) {
@@ -386,45 +356,52 @@ const handleDeleteAction = () => {
 }
 
 .message-text :deep(pre) {
-  background: #f6f8fa;
-  padding: 16px;
-  border-radius: 8px;
+  background: #132b30;
+  color: #f3fffd;
+  padding: 13px;
+  border-radius: 10px;
   overflow-x: auto;
-  margin: 12px 0;
-  border: 1px solid #e1e4e8;
+  margin: 10px 0;
+  border: 1px solid rgba(220, 248, 243, 0.16);
+  font-size: 12px;
 }
 
 .message-user .message-text :deep(pre) {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 .message-text :deep(code) {
-  background: #f6f8fa;
-  padding: 3px 8px;
-  border-radius: 4px;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  background: rgba(13, 54, 58, 0.08);
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', 'Cascadia Code', 'Consolas', monospace;
   font-size: 0.9em;
-  color: #e83e8c;
-  border: 1px solid #e1e4e8;
+  color: #0d6164;
+  border: 1px solid rgba(13, 54, 58, 0.1);
 }
 
 .message-user .message-text :deep(code) {
   background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.3);
-  color: white;
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #fff;
 }
 
 .message-text :deep(blockquote) {
-  border-left: 4px solid #667eea;
-  padding-left: 16px;
-  margin: 12px 0;
-  color: #6c757d;
+  border-left: 3px solid #0d887e;
+  padding-left: 12px;
+  margin: 10px 0;
+  color: #385156;
   font-style: italic;
 }
 
+.message-user .message-text :deep(blockquote) {
+  border-left-color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.92);
+}
+
 .message-footer {
-  margin-top: 10px;
+  margin-top: 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -433,32 +410,21 @@ const handleDeleteAction = () => {
 
 .message-meta {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
-}
-
-.thinking {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: #667eea;
-}
-
-.thinking-text {
-  font-size: 13px;
 }
 
 .thinking-block {
-  margin-top: 10px;
-  padding: 12px;
-  border-radius: 8px;
-  background: #f6f7ff;
-  border: 1px solid #e5e7ff;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: linear-gradient(140deg, rgba(14, 148, 137, 0.08) 0%, rgba(14, 148, 137, 0.14) 100%);
+  border: 1px solid rgba(14, 148, 137, 0.2);
 }
 
 .thinking-title {
-  font-weight: 600;
-  color: #4f46e5;
+  font-weight: 620;
+  color: #0d746d;
   margin-bottom: 6px;
 }
 
@@ -466,20 +432,21 @@ const handleDeleteAction = () => {
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-right: 8px;
+  margin-right: 6px;
 }
 
 .alternative-counter {
   font-size: 11px;
-  color: #667eea;
-  font-weight: 600;
+  color: #0d7d74;
+  font-weight: 620;
   padding: 0 4px;
   user-select: none;
 }
 
 .message-actions {
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transform: translateY(4px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -487,17 +454,36 @@ const handleDeleteAction = () => {
 
 .message-item:hover .message-actions {
   opacity: 1;
+  transform: translateY(0);
 }
 
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(20px) scale(0.95);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 760px) {
+  .message-item {
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .message-content {
+    max-width: 100%;
+  }
+
+  .message-body {
+    padding: 12px 12px;
+  }
+
+  .message-text {
+    font-size: 13px;
   }
 }
 </style>
-

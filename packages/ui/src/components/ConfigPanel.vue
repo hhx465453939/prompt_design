@@ -251,6 +251,17 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 const message = useMessage();
+const runtimeEnv = (globalThis as any).__PROMPT_MATRIX_ENV__ as Partial<Record<string, string>> | undefined;
+
+const normalizeProviderBaseURL = (provider: UserConfig['provider'], baseURL?: string): string => {
+  const raw = (baseURL || '').trim();
+  if (!raw) return '';
+  const trimmed = raw.replace(/\/+$/, '');
+  if (provider === 'deepseek' || provider === 'openai' || provider === 'openrouter') {
+    return /\/v\d+($|\/)/i.test(trimmed) ? trimmed : `${trimmed}/v1`;
+  }
+  return trimmed;
+};
 
 // 表单数据
 const formData = ref<UserConfig>({ 
@@ -378,8 +389,9 @@ const handleProviderChange = (value: string) => {
     // console.log('🔧 切换到预设供应商:', value);
     
     // 获取默认的 baseURL
+    const deepseekBaseFromEnv = normalizeProviderBaseURL('deepseek', runtimeEnv?.VITE_DEEPSEEK_BASE_URL);
     const defaultBaseURLs: Record<string, string> = {
-      deepseek: 'https://api.deepseek.com/v1',
+      deepseek: deepseekBaseFromEnv || 'https://api.deepseek.com/v1',
       openai: 'https://api.openai.com/v1',
       gemini: 'https://generativelanguage.googleapis.com/v1beta',
       openrouter: 'https://openrouter.ai/api/v1',

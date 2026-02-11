@@ -12,6 +12,20 @@ function nextMessageId(prefix = 'msg'): string {
   return `${prefix}-${Date.now()}-${messageIdSeed}`;
 }
 
+function ensureUniqueMessageIds(source: ChatMessage[]): ChatMessage[] {
+  const usedIds = new Set<string>();
+  return source.map((message) => {
+    const currentId = String(message.id || '').trim();
+    const prefix = message.role === 'assistant' ? 'assistant' : message.role === 'user' ? 'user' : 'msg';
+    const finalId = currentId && !usedIds.has(currentId) ? currentId : nextMessageId(prefix);
+    usedIds.add(finalId);
+    return {
+      ...message,
+      id: finalId,
+    };
+  });
+}
+
 export function useChatStore() {
   const STORAGE_KEY = 'prompt-matrix-chat-history';
   const messages = ref<ChatMessage[]>(loadHistory());
@@ -89,7 +103,7 @@ export function useChatStore() {
   };
 
   const setMessages = (newMessages: ChatMessage[]) => {
-    messages.value = [...newMessages];
+    messages.value = ensureUniqueMessageIds(newMessages);
     persist();
   };
 
@@ -106,7 +120,8 @@ export function useChatStore() {
   function loadHistory(): ChatMessage[] {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : [];
+      const parsed = raw ? (JSON.parse(raw) as ChatMessage[]) : [];
+      return ensureUniqueMessageIds(parsed);
     } catch {
       return [];
     }

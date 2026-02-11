@@ -1,6 +1,18 @@
 <template>
   <div class="app-content">
-    <!-- 主聊天窗口 -->
+    <div class="app-main">
+      <div class="app-flow-wrapper">
+        <FlowTimeline
+          :steps="flowSteps"
+          :templates="flowTemplates"
+          :active-template-id="flowActiveTemplateId"
+          :running="flowRunning"
+          @select-template="handleSelectFlowTemplate"
+          @run-flow="runCurrentFlow"
+        />
+      </div>
+
+      <!-- 主聊天窗口 -->
     <ChatWindow
       :messages="chatStore.messages.value"
       :loading="chatStore.loading.value"
@@ -19,6 +31,7 @@
       @custom-agents-update="handleCustomAgentsUpdate"
       @delete-message="handleDeleteMessage"
     />
+    </div>
 
     <!-- 配置面板 -->
     <ConfigPanel
@@ -63,8 +76,16 @@ import {
   useMessage,
   useDialog,
 } from 'naive-ui';
-import { ChatWindow, ConfigPanel, useChatStore, useConfigStore, useChatHistory } from '@prompt-matrix/ui';
-import type { UserConfig as UIUserConfig } from '@prompt-matrix/ui';
+import {
+  ChatWindow,
+  ConfigPanel,
+  FlowTimeline,
+  useChatStore,
+  useConfigStore,
+  useChatHistory,
+  useFlowRunner,
+} from '@prompt-matrix/ui';
+import type { UserConfig as UIUserConfig, FlowStep, FlowTemplate } from '@prompt-matrix/ui';
 import { LLMService, RouterService } from '@prompt-matrix/core';
 import type { ChatMessage } from '@prompt-matrix/ui';
 // 导出/复制：取最后一条 AI 消息
@@ -101,37 +122,75 @@ const dialog = useDialog();
 const showConfig = ref(false);
 const showWelcome = ref(false);
 
+// Flow 状态机（前端多 Agent 编排）
+const flow = useFlowRunner();
+const flowRunning = ref(false);
+
+const flowSteps = flow.steps as unknown as FlowStep[];
+const flowTemplates = flow.templates as unknown as FlowTemplate[];
+const flowActiveTemplateId = flow.activeTemplateId as unknown as string | null;
+
 // 服务实例
 let llmService: LLMService | null = null;
 let routerService: RouterService | null = null;
 let customAgentsRegistered = false; // 添加标记防止重复注册
 
+type CustomAgentPayload = {
+  id: string;
+  name: string;
+  prompt: string;
+  expertise?: string;
+  icon: string;
+  color: string;
+};
+
+let pendingCustomAgents: CustomAgentPayload[] = [];
+
+const normalizeCustomAgentId = (id: string): string => {
+  return String(id || '').replace(/^CUSTOM_+/i, '').trim();
+};
+
+const normalizeCustomAgents = (agents: CustomAgentPayload[]): CustomAgentPayload[] => {
+  const deduped = new Map<string, CustomAgentPayload>();
+  agents.forEach((agent) => {
+    const normalizedId = normalizeCustomAgentId(agent.id);
+    if (!normalizedId) return;
+    deduped.set(normalizedId, {
+      ...agent,
+      id: normalizedId,
+    });
+  });
+  return Array.from(deduped.values());
+};
+
 /**
  * 注册自定义Agent到RouterService
  */
-const registerCustomAgents = (agents: Array<{ id: string; name: string; prompt: string; expertise?: string; icon: string; color: string }>) => {
+const registerCustomAgents = (agents: CustomAgentPayload[]) => {
+  const normalizedAgents = normalizeCustomAgents(agents);
+  pendingCustomAgents = normalizedAgents;
+
   if (!routerService || !llmService) {
-    console.warn('⚠️ 服务未初始化，无法注册自定义Agent');
     return;
   }
 
   try {
-    // 注册新的自定义Agent
-    agents.forEach(agent => {
+    normalizedAgents.forEach((agent) => {
       const agentConfig = {
-        id: agent.id, // 直接使用原始ID，不做前缀处理
+        id: agent.id,
         name: agent.name,
         prompt: agent.prompt,
         expertise: agent.expertise,
       };
-      
+
       routerService!.registerCustomAgent(agentConfig);
       console.log(`✅ 注册自定义Agent: ${agent.name} (CUSTOM_${agent.id})`);
     });
-    
-    // 标记为已注册
-    customAgentsRegistered = true;
-    
+
+    customAgentsRegistered = normalizedAgents.length > 0;
+    if (normalizedAgents.length > 0) {
+      console.log(`✅ 已注册 ${normalizedAgents.length} 个自定义Agent`);
+    }
   } catch (error) {
     console.error('❌ 自定义Agent注册失败:', error);
   }
@@ -176,26 +235,28 @@ const initializeServices = () => {
 
     llmService.initialize(coreConfig);
 
-    // 创建路由服务（只在第一次初始化时创建）
-    if (!routerService) {
-      routerService = new RouterService(llmService);
-    }
-    
-    // 注册已保存的自定义Agent（只注册一次）
-    if (!customAgentsRegistered) {
+    // 每次初始化都重建 RouterService，确保使用最新 LLM 配置
+    routerService = new RouterService(llmService);
+    customAgentsRegistered = false;
+
+    // 优先使用缓存中的自定义 Agent（处理先触发 custom-agents-update 的情况）
+    let agentsToRegister = pendingCustomAgents;
+    if (agentsToRegister.length === 0) {
       const savedAgents = localStorage.getItem('custom-engineers');
       if (savedAgents) {
         try {
-          const agents = JSON.parse(savedAgents);
-          if (agents.length > 0) {
-                registerCustomAgents(agents);
-                customAgentsRegistered = true;
-                console.log(`✅ 已注册 ${agents.length} 个自定义Agent`);
+          const parsed = JSON.parse(savedAgents);
+          if (Array.isArray(parsed)) {
+            agentsToRegister = parsed;
           }
         } catch (error) {
           console.error('❌ 加载自定义Agent失败:', error);
         }
       }
+    }
+
+    if (agentsToRegister.length > 0) {
+      registerCustomAgents(agentsToRegister);
     }
 
     return true;
@@ -298,6 +359,103 @@ const handleSend = async (text: string, selectedAgent?: string) => {
   } finally {
     chatStore.loading.value = false;
   }
+};
+
+/**
+ * 运行当前 Flow（线性多 Agent 串行执行）
+ */
+const runCurrentFlow = async () => {
+  if (flowRunning.value) return;
+
+  const steps = flow.steps.value;
+  if (!steps.length) return;
+
+  if (!routerService) {
+    const success = initializeServices();
+    if (!success) return;
+  }
+
+  flowRunning.value = true;
+  let previousOutput = '';
+
+  try {
+    const lastUserMessage = [...chatStore.messages.value]
+      .reverse()
+      .find((m) => m.role === 'user' && m.content);
+
+    for (const step of steps) {
+      flow.updateStep(step.id, {
+        status: 'running',
+        errorMessage: undefined,
+      });
+
+      let inputText = '';
+      if (step.inputSource === 'user') {
+        if (lastUserMessage) {
+          inputText = step.customInput
+            ? `${step.customInput}\n\n=== 用户输入 ===\n${lastUserMessage.content}`
+            : lastUserMessage.content;
+        } else {
+          inputText = step.customInput || '';
+        }
+      } else if (step.inputSource === 'previousStep') {
+        if (previousOutput) {
+          inputText = step.customInput
+            ? `${step.customInput}\n\n=== 上一步输出 ===\n${previousOutput}`
+            : previousOutput;
+        } else if (lastUserMessage) {
+          inputText = step.customInput
+            ? `${step.customInput}\n\n=== 用户输入 ===\n${lastUserMessage.content}`
+            : lastUserMessage.content;
+        } else {
+          inputText = step.customInput || '';
+        }
+      } else {
+        inputText = step.customInput || '';
+      }
+
+      let accumulatedContent = '';
+
+      await routerService!.handleRequestStream(
+        inputText,
+        (chunk: string) => {
+          accumulatedContent += chunk;
+          flow.updateStep(step.id, {
+            outputFull: accumulatedContent,
+            outputSummary: accumulatedContent.slice(0, 200),
+          });
+        },
+        undefined,
+        {
+          metadata: {
+            forcedAgent: step.agentType,
+          },
+        }
+      );
+
+      previousOutput = accumulatedContent;
+
+      flow.updateStep(step.id, {
+        status: 'success',
+      });
+    }
+  } catch (error) {
+    const messageText = (error as Error).message || 'Flow execution failed';
+    const runningStep = steps.find((s) => s.status === 'running');
+    if (runningStep) {
+      flow.updateStep(runningStep.id, {
+        status: 'error',
+        errorMessage: messageText,
+      });
+    }
+    message.error('Flow 执行失败：' + messageText);
+  } finally {
+    flowRunning.value = false;
+  }
+};
+
+const handleSelectFlowTemplate = (id: string) => {
+  flow.selectTemplate(id);
 };
 
 /**
@@ -450,9 +608,16 @@ const handleTestPrompt = (prompt: string) => {
 /**
  * 处理自定义Agent更新
  */
-const handleCustomAgentsUpdate = (agents: Array<{ id: string; name: string; prompt: string; expertise?: string; icon: string; color: string }>) => {
-  
-  registerCustomAgents(agents);
+const handleCustomAgentsUpdate = (agents: CustomAgentPayload[]) => {
+  pendingCustomAgents = normalizeCustomAgents(agents);
+
+  // 服务已就绪时，重建一次 Router 以同步自定义 Agent 的增删改
+  if (llmService && routerService) {
+    initializeServices();
+    return;
+  }
+
+  registerCustomAgents(pendingCustomAgents);
 };
 
 /**
@@ -619,6 +784,17 @@ onMounted(() => {
 .app-content {
   width: 100%;
   height: 100vh;
+}
+
+.app-main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+}
+
+.app-flow-wrapper {
+  padding: 10px 10px 0;
 }
 
 ul {

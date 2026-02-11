@@ -1,14 +1,14 @@
 <template>
   <div class="chat-sidebar">
     <div class="sidebar-header">
-      <h3 class="sidebar-title">聊天记录</h3>
+      <h3 class="sidebar-title">Chat History</h3>
       <div class="sidebar-actions">
-        <n-button quaternary circle size="small" @click="showBatchActionsDialog = true" title="批量操作">
+        <n-button quaternary circle size="small" @click="showBatchActionsDialog = true" title="Batch actions">
           <template #icon>
             <n-icon><SettingsOutline /></n-icon>
           </template>
         </n-button>
-        <n-button quaternary circle size="small" @click="handleNewChat" title="新建对话">
+        <n-button quaternary circle size="small" @click="handleNewChat" title="New chat">
           <template #icon>
             <n-icon><AddOutline /></n-icon>
           </template>
@@ -50,61 +50,52 @@
       </div>
 
       <div v-if="sessions.length === 0" class="empty-sessions">
-        <n-empty description="暂无聊天记录" size="small" />
+        <n-empty description="No chat sessions yet" size="small" />
       </div>
     </div>
 
     <n-modal
       v-model:show="showRenameDialog"
       preset="dialog"
-      title="重命名对话"
-      positive-text="确定"
-      negative-text="取消"
+      title="Rename chat"
+      positive-text="Save"
+      negative-text="Cancel"
       @positive-click="handleRenameSession"
     >
-      <n-input
-        v-model:value="newSessionTitle"
-        placeholder="请输入新的对话名称"
-        @keyup.enter="handleRenameSession"
-      />
+      <n-input v-model:value="newSessionTitle" placeholder="Enter new chat title" @keyup.enter="handleRenameSession" />
     </n-modal>
 
     <n-modal
       v-model:show="showDeleteDialog"
       preset="dialog"
-      title="确认删除"
+      title="Confirm delete"
       type="warning"
-      positive-text="删除"
-      negative-text="取消"
+      positive-text="Delete"
+      negative-text="Cancel"
       @positive-click="handleDeleteSession"
     >
-      确定要删除这个对话吗？此操作不可撤销。
+      Delete this chat session? This action cannot be undone.
     </n-modal>
 
-    <n-modal v-model:show="showBatchActionsDialog" preset="card" title="批量操作" style="width: 400px">
+    <n-modal v-model:show="showBatchActionsDialog" preset="card" title="Batch actions" style="width: 400px">
       <n-space vertical>
         <n-button @click="handleExportAllSessions" :disabled="sessions.length === 0">
           <template #icon>
             <n-icon><DownloadOutline /></n-icon>
           </template>
-          导出所有聊天记录
+          Export all chat sessions
         </n-button>
       </n-space>
 
       <template #footer>
         <n-space justify="end">
           <n-button @click="toggleSelectMode" :type="isSelectMode ? 'primary' : 'default'">
-            {{ isSelectMode ? '取消选择' : '多选模式' }}
+            {{ isSelectMode ? 'Cancel select' : 'Multi-select' }}
           </n-button>
-          <n-button
-            v-if="isSelectMode"
-            type="error"
-            :disabled="selectedSessions.length === 0"
-            @click="handleDeleteSelected"
-          >
-            删除选中 ({{ selectedSessions.length }})
+          <n-button v-if="isSelectMode" type="error" :disabled="selectedSessions.length === 0" @click="handleDeleteSelected">
+            Delete selected ({{ selectedSessions.length }})
           </n-button>
-          <n-button @click="showBatchActionsDialog = false">关闭</n-button>
+          <n-button @click="showBatchActionsDialog = false">Close</n-button>
         </n-space>
       </template>
     </n-modal>
@@ -124,12 +115,7 @@ import {
   NCheckbox,
   useMessage,
 } from 'naive-ui';
-import {
-  AddOutline,
-  EllipsisVerticalOutline,
-  SettingsOutline,
-  DownloadOutline,
-} from '@vicons/ionicons5';
+import { AddOutline, EllipsisVerticalOutline, SettingsOutline, DownloadOutline } from '@vicons/ionicons5';
 import { useChatHistory } from '../composables/useChatHistory';
 
 interface Emits {
@@ -147,7 +133,6 @@ const showDeleteDialog = ref(false);
 const showBatchActionsDialog = ref(false);
 const selectedSessionId = ref('');
 const newSessionTitle = ref('');
-
 const isSelectMode = ref(false);
 const selectedSessions = ref<string[]>([]);
 
@@ -172,12 +157,16 @@ const handleSessionClick = (sessionId: string) => {
 
 const toggleSelectMode = () => {
   isSelectMode.value = !isSelectMode.value;
-  if (!isSelectMode.value) selectedSessions.value = [];
+  if (!isSelectMode.value) {
+    selectedSessions.value = [];
+  }
 };
 
 const toggleSessionSelection = (sessionId: string, checked: boolean) => {
   if (checked) {
-    if (!selectedSessions.value.includes(sessionId)) selectedSessions.value.push(sessionId);
+    if (!selectedSessions.value.includes(sessionId)) {
+      selectedSessions.value.push(sessionId);
+    }
     return;
   }
   selectedSessions.value = selectedSessions.value.filter((id) => id !== sessionId);
@@ -193,10 +182,10 @@ const handleDeleteSelected = () => {
     showBatchActionsDialog.value = false;
 
     emit('selectSession', currentSessionId.value || '');
-    message.success(`已删除 ${deletedCount} 个聊天记录`);
+    message.success(`Deleted ${deletedCount} chat session(s)`);
   } catch (error) {
     console.error('Delete sessions failed:', error);
-    message.error('删除失败，请重试');
+    message.error('Delete failed, please retry.');
   }
 };
 
@@ -204,7 +193,7 @@ const getSessionMenuOptions = (sessionId: string) => {
   const session = sessions.value.find((s) => s.id === sessionId);
   return [
     {
-      label: '重命名',
+      label: 'Rename',
       key: 'rename',
       props: {
         onClick: () => {
@@ -215,7 +204,7 @@ const getSessionMenuOptions = (sessionId: string) => {
       },
     },
     {
-      label: '删除',
+      label: 'Delete',
       key: 'delete',
       props: {
         style: 'color: #e74c3c',
@@ -231,13 +220,13 @@ const getSessionMenuOptions = (sessionId: string) => {
 const handleRenameSession = () => {
   const title = newSessionTitle.value.trim();
   if (!title) {
-    message.warning('请输入对话名称');
+    message.warning('Please enter a session title.');
     return false;
   }
 
   renameSession(selectedSessionId.value, title);
   showRenameDialog.value = false;
-  message.success('重命名成功');
+  message.success('Chat title updated.');
   return true;
 };
 
@@ -245,7 +234,7 @@ const handleDeleteSession = () => {
   deleteSession(selectedSessionId.value);
   showDeleteDialog.value = false;
   emit('selectSession', currentSessionId.value || '');
-  message.success('删除成功');
+  message.success('Chat deleted.');
   return true;
 };
 
@@ -258,8 +247,8 @@ const formatTime = (timestamp: number) => {
   if (days === 0) {
     return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
   }
-  if (days === 1) return '昨天';
-  if (days < 7) return `${days}天前`;
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days} days ago`;
   return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
 };
 
@@ -286,27 +275,42 @@ const handleExportAllSessions = () => {
     URL.revokeObjectURL(url);
 
     showBatchActionsDialog.value = false;
-    message.success(`已导出 ${sessions.value.length} 个聊天记录`);
+    message.success(`Exported ${sessions.value.length} chat session(s).`);
   } catch (error) {
     console.error('Export sessions failed:', error);
-    message.error('导出失败，请重试');
+    message.error('Export failed, please retry.');
   }
 };
 </script>
 
 <style scoped>
 .chat-sidebar {
-  width: 260px;
+  width: 296px;
   height: 100%;
-  background: #fafafa;
-  border-right: 1px solid #e5e5e5;
+  background: linear-gradient(165deg, #0d3f44 0%, #135f66 58%, #1a7a72 100%);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: var(--pm-radius-xl);
+  box-shadow: var(--pm-shadow-xl);
+  color: #e9fbf7;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.chat-sidebar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(500px 180px at -20% -12%, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0) 60%);
 }
 
 .sidebar-header {
-  padding: 16px;
-  border-bottom: 1px solid #e5e5e5;
+  position: relative;
+  z-index: 1;
+  padding: 16px 16px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -314,9 +318,11 @@ const handleExportAllSessions = () => {
 
 .sidebar-title {
   margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #2c3e50;
+  font-size: 14px;
+  font-weight: 620;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(236, 255, 250, 0.95);
 }
 
 .sidebar-actions {
@@ -324,30 +330,66 @@ const handleExportAllSessions = () => {
   gap: 8px;
 }
 
+.sidebar-actions :deep(.n-button) {
+  color: #e9fbf7;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.sidebar-actions :deep(.n-button:hover) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
 .sessions-list {
+  position: relative;
+  z-index: 1;
   flex: 1;
   overflow-y: auto;
-  padding: 8px;
+  padding: 10px;
+}
+
+.sessions-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sessions-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+}
+
+.sessions-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
 }
 
 .session-item {
-  padding: 12px;
-  margin-bottom: 4px;
-  border-radius: 8px;
+  padding: 11px 10px;
+  margin-bottom: 6px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .session-item:hover {
-  background: #f0f0f0;
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.24);
 }
 
 .session-item.active {
-  background: #e3f2fd;
-  border: 1px solid #2196f3;
+  background: linear-gradient(140deg, rgba(255, 255, 255, 0.2) 0%, rgba(244, 187, 122, 0.22) 100%);
+  border-color: rgba(255, 209, 157, 0.72);
+  box-shadow: 0 8px 22px rgba(6, 44, 49, 0.24);
+}
+
+.session-item.selected {
+  background: linear-gradient(140deg, rgba(228, 142, 80, 0.28) 0%, rgba(237, 168, 105, 0.2) 100%);
+  border-color: rgba(244, 188, 141, 0.7);
 }
 
 .session-content {
@@ -356,9 +398,9 @@ const handleExportAllSessions = () => {
 }
 
 .session-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: #2c3e50;
+  font-size: 13px;
+  font-weight: 580;
+  color: #f1fffc;
   margin-bottom: 4px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -366,8 +408,9 @@ const handleExportAllSessions = () => {
 }
 
 .session-time {
-  font-size: 12px;
-  color: #95a5a6;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: rgba(223, 247, 244, 0.72);
 }
 
 .session-checkbox {
@@ -381,21 +424,50 @@ const handleExportAllSessions = () => {
   transition: opacity 0.2s ease;
 }
 
-.session-item:hover .session-actions {
+.session-actions :deep(.n-button) {
+  color: rgba(245, 255, 252, 0.9);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.session-item:hover .session-actions,
+.session-item.active .session-actions {
   opacity: 1;
-}
-
-.session-item.selected {
-  background: #e0f2fe;
-  border-color: #2196f3;
-}
-
-.session-item.selected:hover {
-  background: #b3e5fc;
 }
 
 .empty-sessions {
   padding: 32px 16px;
   text-align: center;
+}
+
+.empty-sessions :deep(.n-empty__description) {
+  color: rgba(231, 249, 244, 0.78);
+}
+
+@media (max-width: 1100px) {
+  .chat-sidebar {
+    width: 242px;
+  }
+}
+
+@media (max-width: 760px) {
+  .chat-sidebar {
+    width: 100%;
+    height: auto;
+    min-height: 178px;
+    max-height: 212px;
+    border-radius: 20px;
+  }
+
+  .sidebar-header {
+    padding: 12px;
+  }
+
+  .sessions-list {
+    padding: 8px;
+  }
+
+  .session-item {
+    padding: 10px 9px;
+  }
 }
 </style>

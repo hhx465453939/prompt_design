@@ -169,7 +169,7 @@ cd prompt_design
 pnpm install
 ```
 
-#### 3. 配置API密钥（非必要，推荐在前端页面配置）
+#### 3. 配置API密钥（非必要，可作为团队默认模型使用，个人用户推荐在前端页面配置）
 复制配置模板：
 ```bash
 cp env.example .env.local

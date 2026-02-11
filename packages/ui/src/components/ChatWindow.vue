@@ -1,18 +1,12 @@
 <template>
   <div class="chat-window">
-    <!-- 侧边栏 -->
-    <ChatSidebar
-      @new-chat="handleNewChat"
-      @select-session="handleSelectSession"
-    />
+    <ChatSidebar @new-chat="handleNewChat" @select-session="handleSelectSession" />
 
-    <!-- 主聊天区域 -->
     <div class="chat-main">
-      <!-- 顶部标题栏 -->
       <div class="chat-header">
         <div class="header-left">
-          <h1 class="title">🤖 智能提示词工程师</h1>
-          <p class="subtitle">AI Agent 矩阵 · 智能路由系统</p>
+          <h1 class="title">Prompt Matrix Studio</h1>
+          <p class="subtitle">AI Agent Matrix - Smart Routing</p>
         </div>
         <div class="header-right">
           <n-button quaternary circle @click="emit('openSettings')">
@@ -20,10 +14,9 @@
               <n-icon><SettingsOutline /></n-icon>
             </template>
           </n-button>
-          </div>
+        </div>
       </div>
 
-      <!-- 消息列表区域 -->
       <div ref="messagesContainer" class="messages-container">
         <div v-if="messages.length === 0" class="empty-state">
           <div class="empty-icon">
@@ -31,12 +24,12 @@
               <ChatboxOutline />
             </n-icon>
           </div>
-          <h2 class="empty-title">开始对话，让 AI Agent 帮你生成和优化提示词</h2>
+          <h2 class="empty-title">Start chatting and let AI agents build better prompts for you</h2>
           <p class="empty-description">
-            基于智能路由系统，自动识别你的需求并调度专业 Agent
+            The conductor routes your request to the best expert automatically.
           </p>
           <div class="example-cards">
-            <div class="example-label">💡 快速开始</div>
+            <div class="example-label">Quick Start</div>
             <div class="example-grid">
               <div
                 v-for="(example, index) in examples"
@@ -64,30 +57,23 @@
         </TransitionGroup>
       </div>
 
-      <!-- 输入框区域 -->
       <div class="input-area">
         <div class="mode-select">
-          <n-select 
-            v-model:value="chatMode" 
-            :options="modeOptions"
-            size="small" 
-            style="width: 180px"
-          />
+          <n-select v-model:value="chatMode" :options="modeOptions" size="small" style="width: 180px" />
         </div>
         <div v-if="chatMode === 'agent'" class="agent-select">
-          <n-select 
-            v-model:value="forcedAgent" 
-            :options="agentOptions" 
-            size="small" 
+          <n-select
+            v-model:value="forcedAgent"
+            :options="agentOptions"
+            size="small"
             style="width: 280px"
-            placeholder="选择专家Agent"
-            :render-label="renderAgentSelectOption"
+            placeholder="Choose an expert agent"
           />
           <n-button
             quaternary
             size="small"
             @click="showCustomAgentDialog = true"
-            title="自定义提示词工程师"
+            title="Create custom prompt engineer"
           >
             <template #icon>
               <n-icon><AddCircleOutline /></n-icon>
@@ -96,85 +82,76 @@
         </div>
         <div v-else class="free-chat-hint">
           <n-text type="info" depth="3" style="font-size: 12px;">
-            📝 自由聊天模式 - 直接测试提示词
+            Free chat mode: test a prompt directly
           </n-text>
         </div>
+
         <InputBox
           v-model="inputText"
           :loading="loading"
           :disabled="!isConfigured"
-          :placeholder="chatMode === 'free' ? '输入提示词或问题进行测试...' : '输入您的问题，AI Agent 将自动为您处理...'"
+          :placeholder="chatMode === 'free' ? 'Enter a prompt or question to test...' : 'Ask your question and the best agent will respond...'"
           @send="handleSend"
           @export-md="emit('exportMd')"
           @copy-md="emit('copyMd')"
         />
+
         <n-text v-if="!isConfigured" depth="3" class="config-hint">
-          ⚠️ 请先在设置中配置 API 密钥
+          Configure API key first in settings.
         </n-text>
       </div>
     </div>
 
-    <!-- 自定义工程师对话框 -->
-    <n-modal v-model:show="showCustomAgentDialog" preset="card" :title="customAgentDialogTitle" style="width: 500px;">
-      <n-form ref="customAgentFormRef" :model="customAgentForm" label-placement="top">
-        <n-form-item label="工程师名称" required>
-          <n-input 
-            v-model:value="customAgentForm.name" 
-            placeholder="给你的提示词工程师起个名字，如：Python专家、营销顾问等"
-                    />
+    <n-modal v-model:show="showCustomAgentDialog" preset="card" title="Custom Engineer" style="width: 500px;">
+      <n-form :model="customAgentForm" label-placement="top">
+        <n-form-item label="Engineer name" required>
+          <n-input v-model:value="customAgentForm.name" placeholder="e.g. Python Architect" />
         </n-form-item>
-        <n-form-item label="系统提示词" required>
-          <n-input 
-            v-model:value="customAgentForm.prompt" 
+        <n-form-item label="System prompt" required>
+          <n-input
+            v-model:value="customAgentForm.prompt"
             type="textarea"
-            placeholder="isEditingAgent ? '更新工程师的系统提示词...' : '定义工程师的角色、专业领域、工作风格等。例如：你是一个资深的Python开发工程师，擅长代码优化、架构设计...'"
+            placeholder="Define role, expertise, workflow and output style"
             :autosize="{ minRows: 4, maxRows: 8 }"
           />
         </n-form-item>
-        <n-form-item label="专业领域（可选）">
-          <n-input 
-            v-model:value="customAgentForm.expertise" 
-            placeholder="isEditingAgent ? '更新专业领域...' : '如：编程、写作、营销、设计等'"
-          />
+        <n-form-item label="Expertise (optional)">
+          <n-input v-model:value="customAgentForm.expertise" placeholder="e.g. coding, writing, marketing" />
         </n-form-item>
       </n-form>
-      
+
       <template #footer>
         <n-space justify="end">
-          <n-button @click="handleCancelCustomAgentDialog">取消</n-button>
-          <n-button type="primary" @click="isEditingAgent ? handleUpdateCustomAgent() : handleCreateCustomAgent()" :disabled="!customAgentForm?.name?.trim() || !customAgentForm?.prompt?.trim()">
-            {{ isEditingAgent ? '更新工程师' : '创建工程师' }}
+          <n-button @click="showCustomAgentDialog = false">Cancel</n-button>
+          <n-button
+            type="primary"
+            @click="handleCreateCustomAgent"
+            :disabled="!customAgentForm.name.trim() || !customAgentForm.prompt.trim()"
+          >
+            Create
           </n-button>
         </n-space>
       </template>
-    </n-modal>
-
-    <!-- 删除确认对话框 -->
-    <n-modal
-      v-model:show="showDeleteAgentDialog"
-      preset="dialog"
-      title="确认删除"
-      type="warning"
-      positive-text="删除"
-      negative-text="取消"
-      @positive-click="handleDeleteCustomAgent"
-    >
-      确定要删除自定义工程师「{{ agentToDelete?.name }}」吗？此操作不可撤销。
     </n-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, watch, onMounted, h } from 'vue';
-import { NButton, NIcon, NEmpty, NSpace, NText, NSelect, NModal, NCard, NInput, NForm, NFormItem, useMessage, useDialog } from 'naive-ui';
+import { ref, computed, nextTick, watch, onMounted } from 'vue';
 import {
-  SettingsOutline,
-  TrashOutline,
-  ChatboxOutline,
-  AddCircleOutline,
-  CreateOutline,
-  PencilOutline,
-} from '@vicons/ionicons5';
+  NButton,
+  NIcon,
+  NSpace,
+  NText,
+  NSelect,
+  NModal,
+  NInput,
+  NForm,
+  NFormItem,
+  useMessage,
+  useDialog,
+} from 'naive-ui';
+import { SettingsOutline, ChatboxOutline, AddCircleOutline } from '@vicons/ionicons5';
 import MessageItem from './MessageItem.vue';
 import InputBox from './InputBox.vue';
 import ChatSidebar from './ChatSidebar.vue';
@@ -185,6 +162,15 @@ interface Props {
   messages: ChatMessage[];
   loading?: boolean;
   isConfigured?: boolean;
+}
+
+interface CustomAgent {
+  id: string;
+  name: string;
+  prompt: string;
+  expertise?: string;
+  icon: string;
+  color: string;
 }
 
 interface Emits {
@@ -200,7 +186,7 @@ interface Emits {
   (e: 'testPrompt', prompt: string): void;
   (e: 'updateLoading', loading: boolean): void;
   (e: 'regenerate', userMessage: string, originalMessage: ChatMessage): void;
-  (e: 'customAgentsUpdate', agents: Array<{ id: string; name: string; prompt: string; expertise?: string; icon: string; color: string }>): void;
+  (e: 'customAgentsUpdate', agents: CustomAgent[]): void;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -212,539 +198,165 @@ const emit = defineEmits<Emits>();
 const message = useMessage();
 const dialog = useDialog();
 
-// 聊天历史管理
-const {
-  currentSession,
-  createSession,
-  switchSession,
-  updateSessionMessages,
-} = useChatHistory();
+const { createSession, switchSession, updateSessionMessages } = useChatHistory();
 
-// 输入文本
 const inputText = ref('');
 const forcedAgent = ref<string>('AUTO');
-const chatMode = ref('agent'); // 'agent' 或 'free'
-
-// 自定义工程师相关状态
+const chatMode = ref<'agent' | 'free'>('agent');
 const showCustomAgentDialog = ref(false);
-const customAgentFormRef = ref();
-const customAgents = ref<Array<{ id: string; name: string; prompt: string; expertise?: string; icon: string; color: string }>>([]);
+const customAgents = ref<CustomAgent[]>([]);
 const customAgentForm = ref({
   name: '',
   prompt: '',
   expertise: '',
 });
+const messagesContainer = ref<HTMLElement>();
 
-// 编辑和删除相关状态
-const isEditingAgent = ref(false);
-const editingAgentId = ref<string | null>(null);
-const showDeleteAgentDialog = ref(false);
-const agentToDelete = ref<{ id: string; name: string; prompt: string; expertise?: string; icon: string; color: string } | null>(null);
-
-// 计算属性
-const customAgentDialogTitle = computed(() => {
-  return isEditingAgent.value ? '编辑自定义工程师' : '自定义提示词工程师';
-});
-
-// 从 localStorage 加载自定义工程师
-const loadCustomAgents = () => {
-  try {
-    const saved = localStorage.getItem('custom-engineers');
-    if (saved) {
-      customAgents.value = JSON.parse(saved);
-      // console.log('🔧 加载自定义工程师:', customAgents.value.length, '个');
-      
-      // 通知父组件更新自定义Agent
-      if (customAgents.value.length > 0) {
-        emit('customAgentsUpdate', customAgents.value);
-      }
-    }
-  } catch (error) {
-    console.error('❌ 加载自定义工程师失败:', error);
-  }
-};
-
-// 保存自定义工程师到 localStorage
-const saveCustomAgents = () => {
-  try {
-    localStorage.setItem('custom-engineers', JSON.stringify(customAgents.value));
-    // console.log('🔧 保存自定义工程师:', customAgents.value.length, '个');
-  } catch (error) {
-    console.error('❌ 保存自定义工程师失败:', error);
-  }
-};
-
-// 模式选项
 const modeOptions = [
-  { label: '🤖 智能Agent模式', value: 'agent' },
-  { label: '💬 自由聊天模式', value: 'free' },
+  { label: 'Agent Mode', value: 'agent' },
+  { label: 'Free Chat', value: 'free' },
 ];
 
 const agentOptions = computed(() => [
-  { 
-    label: '自动（Conductor）', 
-    value: 'AUTO',
-    hasActions: true,
-    agentType: 'system',
-    agentId: 'AUTO',
-    agentName: 'Conductor'
-  },
-  { 
-    label: 'X0 优化师', 
-    value: 'X0_OPTIMIZER',
-    hasActions: true,
-    agentType: 'system',
-    agentId: 'X0_OPTIMIZER',
-    agentName: 'X0 优化师'
-  },
-  { 
-    label: 'X0 逆向', 
-    value: 'X0_REVERSE',
-    hasActions: true,
-    agentType: 'system',
-    agentId: 'X0_REVERSE',
-    agentName: 'X0 逆向'
-  },
-  { 
-    label: 'X1 基础', 
-    value: 'X1_BASIC',
-    hasActions: true,
-    agentType: 'system',
-    agentId: 'X1_BASIC',
-    agentName: 'X1 基础'
-  },
-  { 
-    label: 'X4 场景', 
-    value: 'X4_SCENARIO',
-    hasActions: true,
-    agentType: 'system',
-    agentId: 'X4_SCENARIO',
-    agentName: 'X4 场景'
-  },
-  ...customAgents.value.map(agent => ({
-    label: `🔧 ${agent.name}`,
+  { label: 'Auto (Conductor)', value: 'AUTO' },
+  { label: 'X0 Optimizer', value: 'X0_OPTIMIZER' },
+  { label: 'X0 Reverse', value: 'X0_REVERSE' },
+  { label: 'X1 Basic', value: 'X1_BASIC' },
+  { label: 'X4 Scenario', value: 'X4_SCENARIO' },
+  ...customAgents.value.map((agent) => ({
+    label: `Custom: ${agent.name}`,
     value: agent.id.startsWith('CUSTOM_') ? agent.id : `CUSTOM_${agent.id}`,
-    hasActions: true,
-    agentType: 'custom',
-    agentId: agent.id,
-    agentName: agent.name,
-    customAgent: true,
   })),
 ]);
 
-// 渲染Agent选择选项
-const renderAgentSelectOption = (option: any) => {
-  if (!option) return h('span', '');
-  
-  return h('div', {
-    class: 'agent-option',
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      width: '100%',
-      position: 'relative'
+const examples = [
+  { icon: '📊', text: 'Design a data analysis assistant prompt' },
+  { icon: '⚡', text: 'Optimize this prompt: You are a Python assistant' },
+  { icon: '🤖', text: 'Design a general AI assistant prompt' },
+  { icon: '🧪', text: 'Build a code review agent prompt' },
+];
+
+const loadCustomAgents = () => {
+  try {
+    const saved = localStorage.getItem('custom-engineers');
+    if (!saved) return;
+    const parsed = JSON.parse(saved) as CustomAgent[];
+    if (!Array.isArray(parsed)) return;
+    customAgents.value = parsed;
+    if (customAgents.value.length > 0) {
+      emit('customAgentsUpdate', customAgents.value);
     }
-  }, [
-    // Agent名称
-    h('span', {
-      style: {
-        flex: 1,
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
-        paddingRight: '8px'
-      }
-    }, option.label || ''),
-    
-    // 操作按钮容器
-    option.hasActions ? h('div', {
-      class: 'agent-actions',
-      style: {
-        display: 'flex',
-        gap: '2px',
-        flexShrink: 0
-      }
-    }, [
-      // 编辑按钮
-      h('button', {
-        type: 'button',
-        class: 'agent-action-btn edit-btn',
-        style: {
-          background: 'none',
-          border: 'none',
-          color: '#666',
-          cursor: 'pointer',
-          padding: '2px 4px',
-          fontSize: '11px',
-          borderRadius: '3px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: '20px',
-          height: '20px'
-        },
-        title: '编辑',
-        onClick: (e: MouseEvent) => {
-          e.stopPropagation();
-          handleEditAgent(option);
-        }
-      }, '✏️'),
-      
-      // 删除按钮（仅自定义Agent显示）
-      option.agentType === 'custom' ? h('button', {
-        type: 'button',
-        class: 'agent-action-btn delete-btn',
-        style: {
-          background: 'none',
-          border: 'none',
-          color: '#e74c3c',
-          cursor: 'pointer',
-          padding: '2px 4px',
-          fontSize: '11px',
-          borderRadius: '3px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: '20px',
-          height: '20px'
-        },
-        title: '删除',
-        onClick: (e: MouseEvent) => {
-          e.stopPropagation();
-          handleDeleteAgent(option);
-        }
-      }, '🗑️') : null
-    ]) : null
-  ]);
-};
-
-// 消息容器
-const messagesContainer = ref<HTMLElement>();
-
-// 处理新建聊天
-const handleNewChat = () => {
-  createSession();
-  // 直接清空当前消息，不触发确认对话框
-  emit('loadSession', []);
-  // 重置loading状态
-  emit('updateLoading', false);
-};
-
-// 处理选择会话
-const handleSelectSession = (sessionId: string) => {
-  const messages = switchSession(sessionId);
-  emit('loadSession', messages);
-  // 重置loading状态
-  emit('updateLoading', false);
-};
-
-// 处理复制消息
-const handleCopyMessage = (message: ChatMessage) => {
-  emit('copyMessage', message);
-};
-
-// 处理测试提示词
-const handleTestMessage = (message: ChatMessage) => {
-  if (message.role === 'assistant' && message.content) {
-    // 切换到自由聊天模式
-    chatMode.value = 'free';
-    // 发送提示词到自由聊天
-    emit('testPrompt', message.content);
-    // 滚动到底部
-    nextTick(() => {
-      scrollToBottom();
-    });
+  } catch (error) {
+    console.error('Failed to load custom agents:', error);
   }
 };
 
-// 处理重新生成
-const handleRegenerateMessage = (message: ChatMessage) => {
-  // console.log('🔄 开始重新生成，目标消息:', message);
-  
-  // 找到对应的用户消息
-  const messageIndex = props.messages.findIndex(m => m.id === message.id);
-  // console.log('🔄 消息索引:', messageIndex);
-  
-  if (messageIndex > 0) {
-    const userMessage = props.messages[messageIndex - 1];
-    // console.log('🔄 找到用户消息:', userMessage);
-    
-    if (userMessage.role === 'user') {
-      // 触发重新生成
-      // console.log('🔄 触发重新生成事件');
-      emit('regenerate', userMessage.content, message);
-    } else {
-      // console.log('🔄 前一条消息不是用户消息:', userMessage.role);
-    }
-  } else {
-    // console.log('🔄 没有找到对应的用户消息');
-  }
+const saveCustomAgents = () => {
+  localStorage.setItem('custom-engineers', JSON.stringify(customAgents.value));
 };
 
-// 处理删除消息
-const handleDeleteMessage = (message: ChatMessage) => {
-  // console.log('🗑️ 删除消息:', message);
-  
-  // 显示确认对话框
-  dialog.warning({
-    title: '确认删除',
-    content: `确定要删除这条${message.role === 'user' ? '用户' : '助手'}消息吗？`,
-    positiveText: '删除',
-    negativeText: '取消',
-    onPositiveClick: () => {
-      emit('deleteMessage', message);
-    },
-  });
-};
-
-// 创建自定义工程师
 const handleCreateCustomAgent = () => {
-  // 安全检查表单数据
-  if (!customAgentForm.value || !customAgentForm.value.name || !customAgentForm.value.prompt) {
-    message.warning('请填写完整的工程师信息');
+  if (!customAgentForm.value.name.trim() || !customAgentForm.value.prompt.trim()) {
+    message.warning('Please provide engineer name and system prompt.');
     return;
   }
 
-  const newAgent = {
+  const newAgent: CustomAgent = {
     id: `${Date.now()}`,
-    name: customAgentForm.value.name,
-    prompt: customAgentForm.value.prompt,
-    expertise: customAgentForm.value.expertise,
-    icon: '🔧',
-    color: '#7c3aed',
+    name: customAgentForm.value.name.trim(),
+    prompt: customAgentForm.value.prompt.trim(),
+    expertise: customAgentForm.value.expertise.trim() || undefined,
+    icon: '🧠',
+    color: '#0d7d74',
   };
 
   customAgents.value.push(newAgent);
-  
-  // 保存到 localStorage
   saveCustomAgents();
-  
-  // 重置表单和状态
-  resetCustomAgentForm();
-  
-  showCustomAgentDialog.value = false;
-  
-  message.success(`自定义工程师 "${newAgent.name}" 创建成功！`);
-  
-  // 自动选择新创建的工程师
+  emit('customAgentsUpdate', customAgents.value);
   forcedAgent.value = `CUSTOM_${newAgent.id}`;
-  
-  // 通知父组件更新自定义Agent
-  emit('customAgentsUpdate', customAgents.value);
-};
 
-// 重置自定义Agent表单
-const resetCustomAgentForm = () => {
-  customAgentForm.value = {
-    name: '',
-    prompt: '',
-    expertise: '',
-  };
-  isEditingAgent.value = false;
-  editingAgentId.value = null;
-};
-
-
-// 处理Agent编辑（支持系统和自定义Agent）
-const handleEditAgent = (option: any) => {
-  if (option.agentType === 'custom') {
-    // 编辑自定义Agent
-    handleEditCustomAgent(option.agentId);
-  } else {
-    // 编辑系统Agent - 显示提示对话框
-    dialog.warning({
-      title: '编辑系统Agent',
-      content: `您确定要编辑系统内置的"${option.agentName}"吗？\n\n⚠️ 注意：修改系统Agent可能会影响系统稳定性，建议仅在有经验的用户操作时进行。`,
-      positiveText: '继续编辑',
-      negativeText: '取消',
-      onPositiveClick: () => {
-        handleEditSystemAgent(option);
-      }
-    });
-  }
-};
-
-// 处理Agent删除（支持系统和自定义Agent）
-const handleDeleteAgent = (option: any) => {
-  if (option.agentType === 'custom') {
-    // 删除自定义Agent
-    const agent = customAgents.value.find(a => a.id === option.agentId);
-    if (agent) {
-      agentToDelete.value = agent;
-      showDeleteAgentDialog.value = true;
-    }
-  } else {
-    // 删除系统Agent - 显示警告对话框
-    dialog.error({
-      title: '删除系统Agent',
-      content: `⚠️ 系统内置Agent不能删除！\n\n"${option.agentName}" 是核心功能组件，删除会导致系统无法正常工作。\n\n如需临时禁用，请在自定义Agent中创建替代版本。`,
-      positiveText: '我了解了',
-      negativeText: '取消',
-      onPositiveClick: () => {
-        // 不执行任何操作，只是关闭对话框
-      }
-    });
-  }
-};
-
-// 处理系统Agent编辑
-const handleEditSystemAgent = (option: any) => {
-  message.info(`正在准备编辑 "${option.agentName}" 的配置...`);
-  // TODO: 这里可以实现系统Agent的编辑功能
-  // 目前先显示一个提示，后续可以扩展为真正的编辑功能
-  message.warning('系统Agent编辑功能正在开发中，敬请期待！');
-};
-
-// 编辑自定义Agent
-const handleEditCustomAgent = (agentId: string) => {
-  const agent = customAgents.value.find(a => a.id === agentId);
-  if (!agent) {
-    message.error('未找到要编辑的工程师');
-    return;
-  }
-
-  // console.log('🔧 编辑自定义Agent:', agent);
-  
-  // 设置表单数据
-  customAgentForm.value = {
-    name: agent.name,
-    prompt: agent.prompt,
-    expertise: agent.expertise || '',
-  };
-  
-  // 设置编辑状态
-  isEditingAgent.value = true;
-  editingAgentId.value = agentId;
-  showCustomAgentDialog.value = true;
-};
-
-// 更新自定义Agent
-const handleUpdateCustomAgent = () => {
-  if (!editingAgentId.value) {
-    message.error('编辑状态异常');
-    return;
-  }
-
-  // 安全检查表单数据
-  if (!customAgentForm.value || !customAgentForm.value.name || !customAgentForm.value.prompt) {
-    message.warning('请填写完整的工程师信息');
-    return;
-  }
-
-  const agentIndex = customAgents.value.findIndex(a => a.id === editingAgentId.value);
-  if (agentIndex === -1) {
-    message.error('未找到要更新的工程师');
-    return;
-  }
-
-  // 更新Agent数据
-  customAgents.value[agentIndex] = {
-    ...customAgents.value[agentIndex],
-    name: customAgentForm.value.name,
-    prompt: customAgentForm.value.prompt,
-    expertise: customAgentForm.value.expertise,
-  };
-
-  // 保存到 localStorage
-  saveCustomAgents();
-  
-  // 重置表单和状态
-  resetCustomAgentForm();
-  
+  customAgentForm.value = { name: '', prompt: '', expertise: '' };
   showCustomAgentDialog.value = false;
-  
-  message.success(`自定义工程师 "${customAgentForm.value.name}" 更新成功！`);
-  
-  // 通知父组件更新自定义Agent
-  emit('customAgentsUpdate', customAgents.value);
+  message.success(`Custom engineer "${newAgent.name}" created.`);
 };
 
-// 删除自定义Agent
-const handleDeleteCustomAgent = () => {
-  if (!agentToDelete.value) {
-    message.error('删除状态异常');
-    return;
-  }
-
-  // console.log('🗑️ 删除自定义Agent:', agentToDelete.value);
-
-  // 从列表中移除
-  const agentIndex = customAgents.value.findIndex(a => a.id === agentToDelete.value?.id);
-  if (agentIndex !== -1) {
-    customAgents.value.splice(agentIndex, 1);
-    
-    // 保存到 localStorage
-    saveCustomAgents();
-    
-    // 如果当前选择的是要删除的Agent，重置为AUTO
-    if (forcedAgent.value === `CUSTOM_${agentToDelete.value.id}`) {
-      forcedAgent.value = 'AUTO';
-    }
-    
-    message.success(`自定义工程师 "${agentToDelete.value.name}" 已删除`);
-    
-    // 通知父组件更新自定义Agent
-    emit('customAgentsUpdate', customAgents.value);
-  }
-
-  // 重置删除状态
-  agentToDelete.value = null;
-  showDeleteAgentDialog.value = false;
+const handleNewChat = () => {
+  createSession();
+  emit('loadSession', []);
+  emit('updateLoading', false);
 };
 
-// 取消自定义Agent对话框
-const handleCancelCustomAgentDialog = () => {
-  resetCustomAgentForm();
-  showCustomAgentDialog.value = false;
+const handleSelectSession = (sessionId: string) => {
+  const messages = switchSession(sessionId);
+  emit('loadSession', messages);
+  emit('updateLoading', false);
 };
 
-// 示例提示
-const examples = [
-  { icon: '📊', text: '帮我设计一个数据分析助手' },
-  { icon: '⚡', text: '优化这个提示词：你是一个Python助手' },
-  { icon: '🤖', text: '设计一个通用的AI助手' },
-  { icon: '📝', text: '我需要一个代码审查助手' },
-];
-
-// 发送消息
-const handleSend = () => {
-  if (inputText.value.trim()) {
-    const text = inputText.value.trim();
-    if (chatMode.value === 'free') {
-      // 自由聊天模式
-      emit('freeChat', text);
-    } else {
-      // Agent模式
-      emit('send', text, forcedAgent.value);
-    }
-    inputText.value = '';
-  }
+const handleCopyMessage = (chatMessage: ChatMessage) => {
+  emit('copyMessage', chatMessage);
 };
 
-// 自动滚动到底部
-const scrollToBottom = () => {
-  nextTick(() => {
-    if (messagesContainer.value) {
-      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
-    }
+const handleTestMessage = (chatMessage: ChatMessage) => {
+  if (chatMessage.role !== 'assistant' || !chatMessage.content) return;
+  chatMode.value = 'free';
+  emit('testPrompt', chatMessage.content);
+  nextTick(scrollToBottom);
+};
+
+const handleRegenerateMessage = (chatMessage: ChatMessage) => {
+  const messageIndex = props.messages.findIndex((m) => m.id === chatMessage.id);
+  if (messageIndex <= 0) return;
+
+  const userMessage = props.messages[messageIndex - 1];
+  if (userMessage.role !== 'user') return;
+
+  emit('regenerate', userMessage.content, chatMessage);
+};
+
+const handleDeleteMessage = (chatMessage: ChatMessage) => {
+  dialog.warning({
+    title: 'Confirm delete',
+    content: `Delete this ${chatMessage.role} message?`,
+    positiveText: 'Delete',
+    negativeText: 'Cancel',
+    onPositiveClick: () => emit('deleteMessage', chatMessage),
   });
 };
 
-// 监听消息变化，更新聊天历史
-watch(() => props.messages, (newMessages) => {
-  updateSessionMessages(newMessages);
-  scrollToBottom();
-}, { deep: true });
+const handleSend = () => {
+  const text = inputText.value.trim();
+  if (!text) return;
 
-// 监听消息变化，自动滚动
-watch(() => props.messages.length, scrollToBottom);
+  if (chatMode.value === 'free') {
+    emit('freeChat', text);
+  } else {
+    emit('send', text, forcedAgent.value);
+  }
 
-// 初始化时加载自定义工程师
+  inputText.value = '';
+};
+
+const scrollToBottom = () => {
+  if (!messagesContainer.value) return;
+  messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
+};
+
+watch(
+  () => props.messages,
+  (newMessages) => {
+    updateSessionMessages(newMessages);
+    nextTick(scrollToBottom);
+  },
+  { deep: true }
+);
+
+watch(
+  () => props.messages.length,
+  () => nextTick(scrollToBottom)
+);
+
 onMounted(() => {
-  // 加载自定义工程师
   loadCustomAgents();
-  // 注意：不在这里自动创建会话，避免与清空历史功能冲突
 });
 </script>
 
@@ -752,23 +364,42 @@ onMounted(() => {
 .chat-window {
   display: flex;
   height: 100vh;
-  background: #f8f9fa;
+  gap: 14px;
+  padding: 14px;
+  background: transparent;
 }
 
 .chat-main {
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  border-radius: var(--pm-radius-xl);
+  border: 1px solid var(--pm-line-soft);
+  background: var(--pm-surface-1);
+  box-shadow: var(--pm-shadow-xl);
+  overflow: hidden;
+  position: relative;
+}
+
+.chat-main::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(14, 148, 137, 0.03) 0%, rgba(230, 121, 47, 0.03) 100%);
 }
 
 .chat-header {
+  position: relative;
+  z-index: 1;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 32px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-  z-index: 10;
+  padding: 20px 24px;
+  background: linear-gradient(120deg, #0f9589 0%, #0d7e75 55%, #0b5e60 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.22);
 }
 
 .header-left {
@@ -777,31 +408,36 @@ onMounted(() => {
 
 .title {
   margin: 0;
-  font-size: 24px;
-  font-weight: 700;
+  font-size: 25px;
+  font-weight: 640;
+  letter-spacing: 0.015em;
   color: white;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  text-wrap: balance;
+  text-shadow: 0 3px 16px rgba(0, 0, 0, 0.16);
 }
 
 .subtitle {
   margin: 6px 0 0;
-  font-size: 13px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: rgba(255, 255, 255, 0.85);
-  font-weight: 500;
+  font-weight: 560;
 }
 
 .header-right {
   display: flex;
-  gap: 12px;
+  gap: 8px;
 }
 
 .header-right :deep(.n-button) {
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(14px);
 }
 
 .header-right :deep(.n-button:hover) {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.24);
 }
 
 .header-right :deep(.n-icon) {
@@ -809,63 +445,114 @@ onMounted(() => {
 }
 
 .messages-container {
+  position: relative;
+  z-index: 1;
   flex: 1;
   overflow-y: auto;
-  padding: 32px;
+  padding: 28px 26px 18px;
   scroll-behavior: smooth;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, rgba(248, 252, 250, 0.9) 100%);
 }
 
 .messages-container::-webkit-scrollbar {
-  width: 8px;
+  width: 9px;
 }
 
 .messages-container::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(16, 71, 73, 0.04);
+  border-radius: 999px;
 }
 
 .messages-container::-webkit-scrollbar-thumb {
-  background: #d0d0d0;
-  border-radius: 4px;
+  background: rgba(17, 76, 78, 0.2);
+  border-radius: 999px;
 }
 
 .messages-container::-webkit-scrollbar-thumb:hover {
-  background: #b0b0b0;
+  background: rgba(17, 76, 78, 0.34);
 }
 
 .empty-state {
-  margin-top: 80px;
+  margin-top: 66px;
   text-align: center;
+  padding: 0 8px;
 }
 
-.empty-icon { margin-bottom: 16px; }
+.empty-icon {
+  margin-bottom: 14px;
+}
 
 .empty-title {
-  font-size: 18px;
-  color: #4b5563;
-  margin: 8px 0 6px;
+  font-size: 20px;
+  font-weight: 620;
+  color: var(--pm-ink-900);
+  margin: 10px 0 6px;
 }
 
 .empty-description {
-  color: #9ca3af;
+  color: var(--pm-ink-500);
   font-size: 13px;
+  line-height: 1.7;
 }
 
-.example-cards { margin-top: 18px; }
-.example-label { color: #6b7280; font-size: 13px; margin-bottom: 10px; }
-.example-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; max-width: 720px; margin: 0 auto; }
-.example-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 12px; display: flex; gap: 8px; align-items: center; justify-content: center; cursor: pointer; transition: all .2s ease; }
-.example-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(102,126,234,.18); border-color: #c7d2fe; }
-.example-icon { font-size: 16px; }
-.example-text { font-size: 13px; color: #374151; }
+.example-cards {
+  margin-top: 22px;
+}
+
+.example-label {
+  color: var(--pm-ink-700);
+  font-size: 12px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.example-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.example-card {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.95) 0%, rgba(243, 251, 248, 0.88) 100%);
+  border: 1px solid var(--pm-line-soft);
+  border-radius: 14px;
+  padding: 12px 12px;
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.22s ease, border-color 0.2s ease;
+}
+
+.example-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--pm-shadow-sm);
+  border-color: rgba(14, 148, 137, 0.35);
+}
+
+.example-icon {
+  font-size: 17px;
+}
+
+.example-text {
+  font-size: 13px;
+  color: var(--pm-ink-700);
+}
 
 .input-area {
-  padding: 20px 32px 24px;
-  background: white;
-  border-top: 1px solid #e8e8e8;
-  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.04);
+  position: relative;
+  z-index: 1;
+  padding: 14px 22px 18px;
+  background: linear-gradient(180deg, rgba(246, 252, 249, 0.84) 0%, rgba(255, 255, 255, 0.97) 100%);
+  border-top: 1px solid var(--pm-line-soft);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .mode-select,
@@ -873,68 +560,102 @@ onMounted(() => {
 .free-chat-hint {
   display: flex;
   align-items: center;
+  gap: 8px;
+}
+
+.mode-select :deep(.n-base-selection),
+.agent-select :deep(.n-base-selection) {
+  border-radius: 11px;
+  border: 1px solid var(--pm-line-soft);
+  background: rgba(255, 255, 255, 0.86);
 }
 
 .free-chat-hint {
   flex: 1;
-  padding: 8px 12px;
-  background: #f0f9ff;
-  border: 1px solid #bae6fd;
-  border-radius: 6px;
+  padding: 8px 10px;
+  background: rgba(14, 148, 137, 0.08);
+  border: 1px solid rgba(14, 148, 137, 0.2);
+  border-radius: 10px;
 }
 
 .config-hint {
   display: block;
-  margin-top: 12px;
-  font-size: 13px;
+  margin-top: 4px;
+  font-size: 12px;
+  letter-spacing: 0.02em;
   text-align: center;
-  color: #f0a020;
-  font-weight: 500;
+  color: #b7642a;
+  font-weight: 560;
 }
 
-/* 消息动画 */
 .message-enter-active {
-  transition: all 0.4s ease;
+  transition: all 0.36s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .message-enter-from {
   opacity: 0;
-  transform: translateY(30px);
+  transform: translateY(18px);
 }
 
-/* Agent选择框悬停效果 */
-.agent-option {
-  position: relative;
+@media (max-width: 1100px) {
+  .chat-window {
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .chat-header {
+    padding: 16px 18px;
+  }
+
+  .messages-container {
+    padding: 22px 16px 14px;
+  }
+
+  .input-area {
+    padding: 12px 14px 14px;
+  }
+
+  .example-grid {
+    grid-template-columns: 1fr;
+    max-width: 540px;
+  }
 }
 
-.agent-option .agent-actions {
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
+@media (max-width: 760px) {
+  .chat-window {
+    flex-direction: column;
+    padding: 8px;
+    gap: 8px;
+  }
 
-.agent-option:hover .agent-actions {
-  opacity: 1;
-}
+  .chat-main {
+    min-height: 0;
+    border-radius: 20px;
+  }
 
-.agent-action-btn {
-  opacity: 0.7;
-  transition: all 0.2s ease;
-}
+  .title {
+    font-size: 21px;
+  }
 
-.agent-action-btn:hover {
-  opacity: 1 !important;
-  background-color: rgba(0, 0, 0, 0.05) !important;
-  transform: scale(1.1);
-}
+  .subtitle {
+    font-size: 11px;
+  }
 
-.edit-btn:hover {
-  background-color: rgba(102, 126, 234, 0.1) !important;
-  color: #667eea !important;
-}
+  .messages-container {
+    padding: 18px 12px 10px;
+  }
 
-.delete-btn:hover {
-  background-color: rgba(231, 76, 60, 0.1) !important;
-  color: #e74c3c !important;
+  .empty-state {
+    margin-top: 30px;
+  }
+
+  .input-area {
+    gap: 8px;
+  }
+
+  .agent-select,
+  .mode-select {
+    width: 100%;
+  }
 }
 </style>
-
