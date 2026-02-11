@@ -1,0 +1,4 @@
+interface:
+  display_name: "Code Debugger"
+  short_description: "上下文优先的调试与增量开发流程，维护 .debug 记录并给出验证步骤"
+  default_prompt: "使用 $code-debugger 先梳理调用链再修复问题，并更新 .debug 记录。"

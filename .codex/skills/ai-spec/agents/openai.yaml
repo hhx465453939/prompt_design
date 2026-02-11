@@ -1,0 +1,4 @@
+interface:
+  display_name: "AI Spec"
+  short_description: "把模糊需求转成生产级技术规范与可执行指令与任务清单"
+  default_prompt: "使用 $ai-spec 将需求整理为技术规格与可执行步骤。"

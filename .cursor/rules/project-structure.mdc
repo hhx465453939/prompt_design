@@ -1,0 +1,25 @@
+---
+description: Claude Skills Pool 项目结构与技能开发规范
+alwaysApply: true
+---
+
+# Claude Skills Pool 项目规范
+
+本仓库是 **Claude Configuration Factory**：每个 `skills.claude/[SkillName]/` 均为独立配置包，可整体复制到其他项目根目录作为 `.claude` 使用。
+
+## 目录结构
+
+- 技能根目录：`skills.claude/[SkillName]/`（建议英文 kebab-case）
+- 标准子结构：`.claude/commands/`、`.claude/skills/`、`.claude/agents/`（可选）、`settings.local.json`（可选）
+
+完整规范与模板见 [CLAUDE.md](mdc:CLAUDE.md)。
+
+## 创建或修改技能时
+
+1. **新技能**：在 `skills.claude/` 下建目录，并创建 `.claude/commands/` 与 `.claude/skills/`，按 [CLAUDE.md](mdc:CLAUDE.md) 中的格式编写 command 与 skill。
+2. **参考实现**：简单单体技能参考 [skills.claude/ai-spec](mdc:skills.claude/ai-spec（编程策略工具）)；多 Agent 参考 [skills.claude/research-analyst-system](mdc:skills.claude/research-analyst-system（金融分析师团队）)。
+3. **不要** 修改根目录的 `.claude`；所有新技能仅放在 `skills.claude/` 下。
+
+## 文件引用
+
+在规则或对话中引用项目文件时，使用相对工作区根路径，例如 `skills.claude/某技能/.claude/commands/xxx.md`。

@@ -1,0 +1,4 @@
+interface:
+  display_name: "API-First 模块化开发"
+  short_description: "后端封装为独立API包，前端只调API，跨层任务按API边界自动分解"
+  default_prompt: "使用 $api-first-modular 框架，将需求按 API 边界拆分并严格按序执行：后端先行 → API文档 → 前端消费 → 集成验证。"

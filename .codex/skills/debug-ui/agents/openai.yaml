@@ -1,0 +1,4 @@
+interface:
+  display_name: "Debug UI"
+  short_description: "顶级 UI 设计师模式，六维视觉诊断 + 像素级代码实施，与 code-debugger 共享 .debug 文档"
+  default_prompt: "使用 $debug-ui 诊断界面视觉问题并直接修改代码优化，同时更新 .debug 记录。"

@@ -1,0 +1,17 @@
+{
+  "$schema": "./schemas/ralph-config.schema.json",
+  "prd": {
+    "outputDir": "tasks",
+    "filenamePattern": "prd-{slug}.md"
+  },
+  "ralph": {
+    "maxIterations": 10,
+    "branchPrefix": "ralph/",
+    "archiveDir": ".claude/archive",
+    "progressFile": "prd-progress.txt",
+    "prdFile": "prd.json"
+  },
+  "amp": {
+    "autoHandoffContext": 90
+  }
+}

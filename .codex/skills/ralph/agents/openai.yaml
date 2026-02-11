@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ralph"
+  short_description: "基于 PRD 的自主 Agent 循环：转换 PRD → 逐个实现 User Story → 自动提交"
+  default_prompt: "使用 $ralph 将 PRD 转为 prd.json 并启动自主循环，逐个实现 User Story。"
