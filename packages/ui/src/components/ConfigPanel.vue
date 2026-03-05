@@ -213,7 +213,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, nextTick } from 'vue';
+import { ref, watch, computed } from 'vue';
 import {
   NDrawer,
   NDrawerContent,
@@ -252,15 +252,41 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 const message = useMessage();
 const runtimeEnv = (globalThis as any).__PROMPT_MATRIX_ENV__ as Partial<Record<string, string>> | undefined;
+const PROVIDER_DEFAULT_MODELS: Record<UserConfig['provider'], string[]> = {
+  deepseek: ['deepseek-chat', 'deepseek-coder', 'deepseek-reasoner'],
+  openai: ['gpt-4o', 'gpt-4.1', 'gpt-4o-mini', 'o1', 'o3-mini'],
+  gemini: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'],
+  openrouter: ['openai/gpt-4o', 'openai/gpt-4o-mini', 'openai/o1', 'google/gemini-2.5-pro'],
+  custom: [],
+};
 
 const normalizeProviderBaseURL = (provider: UserConfig['provider'], baseURL?: string): string => {
   const raw = (baseURL || '').trim();
   if (!raw) return '';
   const trimmed = raw.replace(/\/+$/, '');
+
+  if (provider === 'gemini') {
+    if (/\/openai$/i.test(trimmed)) return trimmed;
+    if (/generativelanguage\.googleapis\.com/i.test(trimmed)) {
+      if (/\/v\d+(\w+)?$/i.test(trimmed)) return `${trimmed}/openai`;
+      return `${trimmed}/v1beta/openai`;
+    }
+    if (/\/v\d+(\w+)?$/i.test(trimmed)) return `${trimmed}/openai`;
+    return trimmed;
+  }
+
   if (provider === 'deepseek' || provider === 'openai' || provider === 'openrouter') {
     return /\/v\d+($|\/)/i.test(trimmed) ? trimmed : `${trimmed}/v1`;
   }
   return trimmed;
+};
+
+const setProviderDefaults = (provider: UserConfig['provider']) => {
+  const fallbackModels = PROVIDER_DEFAULT_MODELS[provider] || [];
+  availableModels.value = fallbackModels;
+  if (fallbackModels.length > 0) {
+    formData.value.model = fallbackModels[0];
+  }
 };
 
 // 表单数据
@@ -271,12 +297,15 @@ const formData = ref<UserConfig>({
 
 // 显示状态
 const visible = ref(props.show);
+const providerOptionsVersion = ref(0);
 
 // 表单引用
 const formRef = ref();
 
 // 提供商选项
 const providerOptions = computed(() => {
+  const version = providerOptionsVersion.value;
+  const dividerValue = `divider_${version}`;
   const options = [
     { label: 'DeepSeek', value: 'deepseek' },
     { label: 'OpenAI', value: 'openai' },
@@ -288,8 +317,8 @@ const providerOptions = computed(() => {
   const customProviders = CoreCustomProviderManager.getProviders();
   if (customProviders.length > 0) {
     options.push(
-      { label: '──────────', value: 'divider' } as any,
-      { label: '🔧 自定义供应商', value: 'divider' } as any,
+      { label: '──────────', value: dividerValue, disabled: true } as any,
+      { label: '🔧 自定义供应商', value: `${dividerValue}_title`, disabled: true } as any,
       ...customProviders.map(provider => ({
         label: `🔌 ${provider.name}`,
         value: `custom_${provider.id}`,
@@ -353,6 +382,9 @@ const loadModels = async () => {
     
     const models = await llmService.getAvailableModels();
     availableModels.value = models;
+    if (models.length > 0 && !models.includes(formData.value.model)) {
+      formData.value.model = models[0];
+    }
     
     message.success(`成功加载 ${models.length} 个模型`);
   } catch (error) {
@@ -367,6 +399,7 @@ const loadModels = async () => {
 // 处理供应商变更
 const handleProviderChange = (value: string) => {
   // console.log('🔧 切换供应商:', value);
+  if (value.startsWith('divider_')) return;
   
   if (value.startsWith('custom_')) {
     // 切换到自定义供应商
@@ -380,7 +413,7 @@ const handleProviderChange = (value: string) => {
       availableModels.value = provider.models;
       
       // 如果有模型列表，自动设置第一个为默认模型
-      if (provider.models.length > 0 && !formData.value.model) {
+      if (provider.models.length > 0 && !provider.models.includes(formData.value.model)) {
         formData.value.model = provider.models[0];
       }
     }
@@ -393,7 +426,7 @@ const handleProviderChange = (value: string) => {
     const defaultBaseURLs: Record<string, string> = {
       deepseek: deepseekBaseFromEnv || 'https://api.deepseek.com/v1',
       openai: 'https://api.openai.com/v1',
-      gemini: 'https://generativelanguage.googleapis.com/v1beta',
+      gemini: 'https://generativelanguage.googleapis.com/v1beta/openai',
       openrouter: 'https://openrouter.ai/api/v1',
     };
     
@@ -401,7 +434,7 @@ const handleProviderChange = (value: string) => {
     formData.value.customProviderId = undefined;
     // 重置 baseURL 为默认值
     formData.value.baseURL = defaultBaseURLs[value] || '';
-    availableModels.value = [];
+    setProviderDefaults(value as UserConfig['provider']);
     
     // console.log('🔧 设置新的 baseURL:', formData.value.baseURL);
   }
@@ -410,12 +443,7 @@ const handleProviderChange = (value: string) => {
 // 自定义供应商保存成功处理
 const handleCustomProviderSaved = (provider: any) => {
   message.success(`自定义供应商 "${provider.name}" 保存成功！`);
-  // 刷新供应商选项 - 强制触发computed重新计算
-  const temp = providerOptions.value;
-  nextTick(() => {
-    // 重新计算providerOptions以包含新添加的供应商
-    providerOptions.value;
-  });
+  providerOptionsVersion.value += 1;
 };
 
 // 获取当前供应商值（用于v-model）
@@ -558,6 +586,10 @@ watch(() => props.show, (val) => {
   visible.value = val;
   if (val) {
     formData.value = { ...props.config };
+    const defaultModels = PROVIDER_DEFAULT_MODELS[formData.value.provider] || [];
+    const modelSet = new Set(defaultModels);
+    if (formData.value.model) modelSet.add(formData.value.model);
+    availableModels.value = Array.from(modelSet);
     // 分析当前选择的模型
     analyzeModelInfo(formData.value.model);
   }

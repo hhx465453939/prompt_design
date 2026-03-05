@@ -22,8 +22,14 @@ const copyMarkdown = async () => {
     const ai = [...chatStore.messages.value].reverse().find(m => m.role === 'assistant' && !m.isLoading && !m.isError);
     if (!ai)
         return message.warning('没有可复制的内容');
-    await navigator.clipboard.writeText(ai.content);
-    message.success('已复制 Markdown');
+    try {
+        await navigator.clipboard.writeText(ai.content);
+        message.success('已复制 Markdown');
+    }
+    catch (error) {
+        console.error('复制 Markdown 失败:', error);
+        message.error('复制失败，请检查浏览器剪贴板权限');
+    }
 };
 // 状态管理
 const chatStore = useChatStore();
@@ -360,22 +366,22 @@ const handleLoadSession = (messages) => {
 /**
  * 复制消息
  */
-const handleCopyMessage = async (message, option = 'markdown') => {
+const handleCopyMessage = async (chatMessage, option = 'markdown') => {
     try {
         let contentToCopy = '';
-        if (option === 'markdown-with-thinking' && message.thinkingProcess) {
+        if (option === 'markdown-with-thinking' && chatMessage.thinkingProcess) {
             // 包含思考过程的内容
             contentToCopy = `## 思考过程
 
-${message.thinkingProcess}
+${chatMessage.thinkingProcess}
 
 ## 回答
 
-${message.content}`;
+${chatMessage.content}`;
         }
         else {
             // 普通markdown内容
-            contentToCopy = message.content;
+            contentToCopy = chatMessage.content;
         }
         await navigator.clipboard.writeText(contentToCopy);
         const actionText = option === 'markdown-with-thinking' ? '（包含思考）' : '';

@@ -6,11 +6,15 @@ This project is a monorepo. The Web app reads runtime env from the workspace roo
 
 Configure model provider once, then make sure requests go to the expected endpoint.
 
-## What Changed (2026-02-11)
+## What Changed (2026-03-05)
 
 - Runtime env now supports loading `VITE_DEEPSEEK_BASE_URL` even when `VITE_DEEPSEEK_API_KEY` is not set.
 - In settings, when switching provider to `DeepSeek`, default Base URL now prefers `.env.local` value first.
 - Chat message IDs are now auto-sanitized to prevent duplicate-key warnings in Vue (`TransitionGroup`).
+- Gemini provider now defaults to OpenAI-compatible endpoint:
+  - `https://generativelanguage.googleapis.com/v1beta/openai`
+- Gemini model refresh now tries live model list first (Google `models` API), then falls back to built-in defaults.
+- Provider switch now auto-resets to provider-appropriate default model to reduce `provider/model` mismatch errors.
 
 ## Prerequisites
 
@@ -40,6 +44,16 @@ pnpm dev
 4. Open Settings in UI and verify:
 - `Provider`: `DeepSeek` (or your custom provider)
 - `Base URL`: should become `https://api.siliconflow.cn/v1` automatically for DeepSeek/OpenAI/OpenRouter providers.
+
+## Gemini Quick Setup
+
+1. Open Settings.
+2. Set `Provider` to `Gemini`.
+3. Confirm `Base URL` is:
+   - `https://generativelanguage.googleapis.com/v1beta/openai`
+4. Paste your Gemini API key.
+5. Click `刷新模型`.
+6. Select one model from the refreshed list and save.
 
 ## Config Priority
 
@@ -71,6 +85,25 @@ If you previously saved wrong settings in UI, they override `.env.local`.
 
 - Confirm key belongs to the selected endpoint/provider.
 - If using SiliconFlow endpoint, use SiliconFlow-issued key, not DeepSeek official key.
+
+### Provider and API key look mismatched
+
+- Typical mismatch:
+  - Gemini key used with `DeepSeek` provider.
+  - `sk-...` style key used with `Gemini` provider.
+- Fix:
+  1. Open Settings and confirm `Provider`.
+  2. Confirm `Base URL` matches that provider.
+  3. Re-enter key for that provider and save.
+
+### Gemini model refresh still only shows fallback models
+
+- Cause: live model list request failed, system fell back to built-in list.
+- Fix:
+  1. Verify Gemini key is valid.
+  2. Keep default Gemini Base URL (`.../v1beta/openai`) unless you use a compatible proxy.
+  3. Retry `刷新模型`.
+  4. If still failing, inspect browser network panel for `/v1beta/models?key=...` response details.
 
 ## Rollback
 

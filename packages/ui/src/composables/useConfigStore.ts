@@ -10,7 +10,7 @@ const RUNTIME_ENV_KEY = '__PROMPT_MATRIX_ENV__';
 const PROVIDER_DEFAULT_BASE_URLS: Record<UserConfig['provider'], string> = {
   deepseek: 'https://api.deepseek.com/v1',
   openai: 'https://api.openai.com/v1',
-  gemini: 'https://generativelanguage.googleapis.com/v1beta',
+  gemini: 'https://generativelanguage.googleapis.com/v1beta/openai',
   openrouter: 'https://openrouter.ai/api/v1',
   custom: '',
 };
@@ -38,6 +38,16 @@ function normalizeBaseURL(provider: UserConfig['provider'], baseURL?: string): s
   }
 
   const trimmed = raw.replace(/\/+$/, '');
+  if (provider === 'gemini') {
+    if (/\/openai$/i.test(trimmed)) return trimmed;
+    if (/generativelanguage\.googleapis\.com/i.test(trimmed)) {
+      if (/\/v\d+(\w+)?$/i.test(trimmed)) return `${trimmed}/openai`;
+      return `${trimmed}/v1beta/openai`;
+    }
+    if (/\/v\d+(\w+)?$/i.test(trimmed)) return `${trimmed}/openai`;
+    return trimmed;
+  }
+
   if (provider === 'deepseek' || provider === 'openai' || provider === 'openrouter') {
     return /\/v\d+($|\/)/i.test(trimmed) ? trimmed : `${trimmed}/v1`;
   }
